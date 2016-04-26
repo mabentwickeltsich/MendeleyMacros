@@ -32,7 +32,7 @@ This is a copy of the original macro installed with Mendeley located in *Mendele
 
 But remember, this will only work if you used a Microsoft Word style for the bibliography. You can use a build-in style or create your own. If you made manual modifications to the format (font and paragraph) directly to the bibliography and then refresh it, it will go back to the original Microsoft Word style settings.
 
-**Important:** This macro will work out if its context. This is just to show what modifications have to be made to the original macro installed by Mendeley's plugin.
+**Important:** This macro will NOT work out if its context. This is just to show what modifications have to be made to the original macro installed by Mendeley's plugin.
 
 ## Installation
 Copy the code to your Microsoft Word macros to install any of the **GWDG_*** macros.
