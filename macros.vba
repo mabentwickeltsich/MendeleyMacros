@@ -2,20 +2,20 @@
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2016-04-26                                                          **
+'**  Last modified: 2016-11-15                                                          **
 '**                                                                                     **
-'**  Sub GAUG_createHyperlinksForCitations()                                            **
+'**  Sub GAUG_createHyperlinksForCitationsIEEE()                                        **
 '**                                                                                     **
 '**  Generates the bookmarks in the bibliography inserted by Mendeley's plugin.         **
 '**  Links the citations inserted by Mendeley's plugin to the corresponding entry       **
 '**     in the bibliography inserted by Mendeley's plugin.                              **
+'**  Only for IEEE CSL citation style.                                                  **
 '*****************************************************************************************
 '*****************************************************************************************
-Sub GAUG_createHyperlinksForCitations()
+Sub GAUG_createHyperlinksForCitationsIEEE()
 
     Dim documentSection As Section
     Dim sectionField As Field
-    Dim fieldBookmark As Bookmark
     Dim blnFound, blnReferenceNumberFound, blnCitationNumberFound As Boolean
     Dim intRefereceNumber As Integer
 
@@ -46,13 +46,16 @@ Sub GAUG_createHyperlinksForCitations()
         
         'checks if the bibliography is in this section
         If blnFound Then
+            'checks all fields
             For Each sectionField In documentSection.Range.Fields
                 'if it is the bibliography
                 If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
                     'start the numbering
                     intRefereceNumber = 1
                     Do
+                        'selects the current field (Mendeley's citation field)
                         sectionField.Select
+                        
                         'finds and selects the text of the number of the reference
                         With Selection.Find
                             .Forward = True
@@ -61,6 +64,7 @@ Sub GAUG_createHyperlinksForCitations()
                             .Execute
                             blnReferenceNumberFound = .Found
                         End With
+                        
                         'if a number of a reference was found, creates the bookmark with the selected text
                         If blnReferenceNumberFound Then
                             'creates the bookmark
@@ -68,14 +72,16 @@ Sub GAUG_createHyperlinksForCitations()
                                 Name:="SignetBibliographie_" & Format(CStr(intRefereceNumber), "00#"), _
                                 Range:=Selection.Range
                         End If
+                        
                         'continues with the next number
                         intRefereceNumber = intRefereceNumber + 1
+                    
                     'while numbers of refereces are found
                     Loop While (blnReferenceNumberFound)
-                End If
-            Next
+                End If 'if it is the biblio
+            Next 'sectionField
         End If
-    Next
+    Next 'documentSection
 
 
 
@@ -87,14 +93,17 @@ Sub GAUG_createHyperlinksForCitations()
 '*****************************
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
+        'checks all fields
         For Each sectionField In documentSection.Range.Fields
             'if it is a citation
             If sectionField.Type = wdFieldAddin And Left(sectionField.Code, 18) = "ADDIN CSL_CITATION" Then
 
                 'check for all numbers of citations
                 For i = 1 To intRefereceNumber
-                    'creates the hyperlinks of the citations
+                    
+                    'selects the current field (Mendeley's citation field)
                     sectionField.Select
+
                     'finds and selects the text of the number of the citation
                     With Selection.Find
                         .Forward = True
@@ -103,24 +112,29 @@ Sub GAUG_createHyperlinksForCitations()
                         .Execute
                         blnCitationNumberFound = .Found
                     End With
+                    
                     'if a number of a citation was found, inserts the hyperlink
                     If blnCitationNumberFound Then
-                        Selection.Fields.Add Range:=Selection.Range, _
-                        Type:=wdFieldEmpty, _
-                        Text:="REF " & Chr(34) & "SignetBibliographie_" & Format(CStr(i), "00#") & Chr(34) & " \h", _
-                        PreserveFormatting:=True
-
+                        'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
+                        'Selection.Fields.Add Range:=Selection.Range, _
+                        '    Type:=wdFieldEmpty, _
+                        '    Text:="REF " & Chr(34) & "SignetBibliographie_" & Format(CStr(i), "00#") & Chr(34) & " \h", _
+                        '    PreserveFormatting:=True
+                        'better to use normal hyperlink:
+                        Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                            Address:="", SubAddress:="SignetBibliographie_" & Format(CStr(i), "00#"), _
+                            ScreenTip:=""
                     End If
-                Next
+                Next 'all numbers of citations
 
-            End If
-        Next
-    Next
+            End If 'if it is a citation
+        Next 'sectionField
+    Next 'documentSection
 
 End Sub
 
 
-    
+
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
