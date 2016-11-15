@@ -1,3 +1,302 @@
+'*****************************************************************************************
+'*****************************************************************************************
+'**  Author: José Luis González García                                                  **
+'**  Last modified: 2016-11-15                                                          **
+'**                                                                                     **
+'**  Sub GAUG_createHyperlinksForCitationsAPA()                                         **
+'**                                                                                     **
+'**  Generates the bookmarks in the bibliography inserted by Mendeley's plugin.         **
+'**  Links the citations inserted by Mendeley's plugin to the corresponding entry       **
+'**     in the bibliography inserted by Mendeley's plugin.                              **
+'**  Only for APA CSL citation style.                                                   **
+'*****************************************************************************************
+'*****************************************************************************************
+Sub GAUG_createHyperlinksForCitationsAPA()
+
+    Dim documentSection As Section
+    Dim sectionField As Field
+    Dim blnFound, blnReferenceEntryFound, blnCitationEntryFound, blnCitationEntryPositionFound, blnEditorsFound As Boolean
+    Dim intRefereceNumber, intCitationEntryPosition, i As Integer
+    Dim objRegExpBiblio, objRegExpCitation, objRegExpCitationData, objRegExpBiblioEntry As RegExp
+    Dim colMatchesBiblio, colMatchesCitation, colMatchesCitationData, colMatchesBiblioEntry As MatchCollection
+    Dim objMatchBiblio, objMatchCitation, objMatchCitationData As Match
+    Dim strTempMatch As String
+
+
+'*****************************
+'*  Cleaning old hyperlinks  *
+'*****************************
+    GAUG_removeHyperlinksForCitations
+
+
+
+
+
+
+'*****************************
+'*   Creation of bookmarks   *
+'*****************************
+    'creates the object for regular expressions (to get all entries in biblio)
+    Set objRegExpBiblio = New RegExp
+    'sets the pattern to match every reference in bibliography (it may include character of carriage return)
+    '(all text from the beginning of the string or carriage return until a year between parentheses is found)
+    objRegExpBiblio.Pattern = "((^)|(\r))[^(\r)]*\(\d\d\d\d[a-zA-Z]?\)"
+    'sets case insensitivity
+    objRegExpBiblio.IgnoreCase = False
+    'sets global applicability
+    objRegExpBiblio.Global = True
+
+    'checks all sections
+    For Each documentSection In ActiveDocument.Sections
+        'checks if the section has text with style "Titre de dernière section"
+        '(it is a section not belonging to any chapter after the sections of parts and chapters)
+        blnFound = False
+        With documentSection.Range.Find
+            .Style = "Titre de dernière section"
+            .Execute
+            blnFound = .Found
+        End With
+
+        'checks if the bibliography is in this section
+        If blnFound Then
+            'checks all fields
+            For Each sectionField In documentSection.Range.Fields
+                'if it is the bibliography
+                If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
+                    'start the numbering
+                    intRefereceNumber = 1
+
+                    'selects the current field (Mendeley's bibliography field)
+                    sectionField.Select
+
+                    'checks that the string can be compared
+                    If (objRegExpBiblio.Test(Selection) = True) Then
+                        'gets the matches (all entries in bibliography according to the regular expression)
+                        Set colMatchesBiblio = objRegExpBiblio.Execute(Selection)
+
+                        'treats all matches (all entries in bibliography) to generate bookmars
+                        '(we have to find AGAIN every entry to select it and create the bookmark)
+                        For Each objMatchBiblio In colMatchesBiblio
+                            'removes the carriage return from match, if necessary
+                            strTempMatch = Replace(objMatchBiblio.Value, Chr(13), "")
+
+                            'selects the current field (Mendeley's bibliography field)
+                            sectionField.Select
+
+                            'finds and selects the text of the current reference
+                            blnReferenceEntryFound = False
+                            With Selection.Find
+                                .Forward = True
+                                .Wrap = wdFindStop
+                                .Text = strTempMatch
+                                .Execute
+                                blnReferenceEntryFound = .Found
+                            End With
+
+                            'if a match was found (it shall always find it, but good practice)
+                            'creates the bookmark with the selected text
+                            If blnReferenceEntryFound Then
+                                'creates the bookmark
+                                Selection.Bookmarks.Add _
+                                    Name:="SignetBibliographie_" & Format(CStr(intRefereceNumber), "00#"), _
+                                    Range:=Selection.Range
+                            End If
+
+                            'continues with the next number
+                            intRefereceNumber = intRefereceNumber + 1
+
+                        Next
+                    End If
+                    'by now, we have created all bookmarks and have all entries in colMatchesBiblio
+                    'for future use when creating the hyperlinks
+
+                End If 'if it is the biblio
+            Next 'sectionField
+        End If
+    Next 'documentSection
+
+
+
+
+
+
+'*****************************
+'*   Linking the bookmarks   *
+'*****************************
+    'creates the object for regular expressions (to get all entries in current citation, all entries of data in current citation, position of citation entry in biblio)
+    Set objRegExpCitation = New RegExp
+    Set objRegExpCitationData = New RegExp
+    Set objRegExpBiblioEntry = New RegExp
+    'sets the pattern to match every citation entry (with or without autors) in current field
+    '(the year of publication is always present, authors may not be present)
+    '(all text non starting by "(" or "," or ";" followed by non digits until a year is found)
+    objRegExpCitation.Pattern = "[^(\(|,|;)][^0-9]*\d\d\d\d[a-zA-Z]?"
+    'sets the pattern to match every citation entry from the data of the current field
+    'original regular expression to get the authors info from Field.Code "((\"id\")|(\"family\")|(\"given\"))\s\:\s\"[^\"]*\""
+    '(all text related to "id", "family" and "given")
+    'objRegExpCitationData.Pattern = "((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & ")|(\" & Chr(34) & "given\" & Chr(34) & "))\s\:\s\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34)
+    'updated to separate authors from editors:
+    objRegExpCitationData.Pattern = "(\" & Chr(34) & "editor\" & Chr(34) & "\s:\s)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s\:\s\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & ")"
+    'sets case insensitivity
+    objRegExpCitation.IgnoreCase = False
+    objRegExpCitationData.IgnoreCase = False
+    objRegExpBiblioEntry.IgnoreCase = False
+    'sets global applicability
+    objRegExpCitation.Global = True
+    objRegExpCitationData.Global = True
+    objRegExpBiblioEntry.Global = True
+    
+    'checks all sections
+    For Each documentSection In ActiveDocument.Sections
+        'checks all fields
+        For Each sectionField In documentSection.Range.Fields
+            'if it is a citation
+            If sectionField.Type = wdFieldAddin And Left(sectionField.Code, 18) = "ADDIN CSL_CITATION" Then
+
+                'selects the current field (Mendeley's citation field)
+                sectionField.Select
+
+                'checks that the string can be compared (both, Selection and Field.Code)
+                If (objRegExpCitation.Test(Selection) = True) And (objRegExpCitationData.Test(sectionField.Code) = True) Then
+                    'gets the matches (all entries in the citation according to the regular expression)
+                    Set colMatchesCitation = objRegExpCitation.Execute(Selection)
+                    'gets the matches (all entries in the citation .Data according to the regular expression)
+                    '(used to find the entry in the bibliography)
+                    Set colMatchesCitationData = objRegExpCitationData.Execute(sectionField.Code)
+                    
+                    'resets the position (current citation entry being treated)
+                    intCitationEntryPosition = 1
+                    
+                    'treats all matches (all entries in citation) to generate hyperlinks
+                    For Each objMatchCitation In colMatchesCitation
+                        'I COULD NOT FIND A MORE EFFICIENT WAY TO SELECT EVERY REFERENCE
+                        'IN ORDER TO CREATE THE LINK:
+                        'Start: Needs re-work
+                        
+                        'flag to find the position of the current citation entry
+                        blnCitationEntryPositionFound = False
+
+                        'flag to skip the name of the editors
+                        blnEditorsFound = False
+
+                        'gets the data from current citation entry to build the pattern to find the reference entry in biblio
+                        objRegExpBiblioEntry.Pattern = ""
+                        For Each objMatchCitationData In colMatchesCitationData
+                            'activates the flag only if in current citation entry
+                            'if the current citation entry starts/ends here ("id" : "ITEM-X")
+                            If objMatchCitationData.Value = Chr(34) & "id" & Chr(34) & " : " & Chr(34) & "ITEM-" & CStr(intCitationEntryPosition) & Chr(34) Then
+                                blnCitationEntryPositionFound = Not blnCitationEntryPositionFound
+                            Else
+                                If blnCitationEntryPositionFound Then
+                                    'if the "editor" names start here
+                                    If objMatchCitationData.Value = Chr(34) & "editor" & Chr(34) & " : " Then
+                                        blnEditorsFound = True
+                                    Else
+                                        'if the names are the author's names
+                                        If Not blnEditorsFound Then
+                                            'gets the last name of the author and adds it to the regular expression
+                                            objRegExpBiblioEntry.Pattern = objRegExpBiblioEntry.Pattern & Replace(Mid(objMatchCitationData.Value, InStr(objMatchCitationData.Value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
+                                        End If
+                                    End If
+                                End If
+                            End If
+
+                        Next
+
+                        'adds the year of current citation entry
+                        If Mid(objMatchCitation.Value, Len(objMatchCitation.Value) - 4, 1) = " " Then
+                            objRegExpBiblioEntry.Pattern = objRegExpBiblioEntry.Pattern & "\(" & Right(objMatchCitation.Value, 4) & "\)"
+                        Else
+                            objRegExpBiblioEntry.Pattern = objRegExpBiblioEntry.Pattern & "\(" & Right(objMatchCitation.Value, 5) & "\)"
+                        End If
+
+                        'at this point, the regular expression to find the entry in the biblio is ready
+
+                        'initializes the position
+                        i = 1
+                        'finds the position of the citation entry in the list of references in the biblio
+                        blnReferenceEntryFound = False
+                        For Each objMatchBiblio In colMatchesBiblio
+                            'gets the matches, if any, to check if this reference entry corresponds to the citation being treated
+                            Set colMatchesBiblioEntry = objRegExpBiblioEntry.Execute(objMatchBiblio.Value)
+                            'if the this is the corresponding reference entry
+                            'Verify for MabEntwickeltSich: perhaps a more strict verification is needed
+                            If colMatchesBiblioEntry.Count > 0 Then
+                                blnReferenceEntryFound = True
+                                Exit For
+                            End If
+                            'continues with the next number
+                            i = i + 1
+                        Next
+
+                        'at this point we also have the position (i) in the biblio, we are ready to create the hyperlink
+
+                        'if reference entry was found (shall always find it), creates the hyperlink
+                        If blnReferenceEntryFound Then
+                            'selects the current field (Mendeley's citation field)
+                            sectionField.Select
+    
+                            'finds the opening parenthesis (first character of the field),
+                            'used to select something inside the field
+                            With Selection.Find
+                                .Forward = True
+                                .Wrap = wdFindStop
+                                .Text = "("
+                                .Execute
+                                blnCitationEntryFound = .Found
+                            End With
+                            
+                            'if a match was found (it should always find it, but good practice)
+                            'selects the correct entry text from the citation field
+                            If blnCitationEntryFound Then
+                                'recalculates the selection to include only the match (entry) in citation
+                                Selection.MoveEnd Unit:=wdCharacter, Count:=objMatchCitation.FirstIndex + objMatchCitation.Length - 1
+                                'if the first character is a blank space
+                                If Left(objMatchCitation.Value, 1) = " " Then
+                                    'removes the leading blank space
+                                    Selection.MoveStart Unit:=wdCharacter, Count:=objMatchCitation.FirstIndex + 1
+                                Else
+                                    'uses the whole range
+                                    Selection.MoveStart Unit:=wdCharacter, Count:=objMatchCitation.FirstIndex
+                                End If
+                                
+                                'creates the hyperlink for the current citation entry
+                                'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
+                                'Selection.Fields.Add Range:=Selection.Range, _
+                                '    Type:=wdFieldEmpty, _
+                                '    Text:="REF " & Chr(34) & "SignetBibliographie_" & Format(CStr(i), "00#") & Chr(34) & " \h", _
+                                '    PreserveFormatting:=True
+                                'better to use normal hyperlink:
+                                Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                    Address:="", SubAddress:="SignetBibliographie_" & Format(CStr(i), "00#"), _
+                                    ScreenTip:=""
+                            
+                            End If
+                        Else
+                            MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!")
+                        End If
+
+                        'Ends: Needs re-work
+
+                        'at this point current citation entry is linked to corresponding reference in bilio
+
+                        'continues with the next position (next citation entry)
+                        intCitationEntryPosition = intCitationEntryPosition + 1
+
+                    Next 'treats all matches (all entries in citation) to generate hyperlinks
+                    
+                End If 'checks that the string can be compared
+
+            End If 'if it is a citation
+        Next 'sectionField
+
+        'at this point all citations are linked to their corresponding reference in bilio
+
+    Next 'documentSection
+
+End Sub
+
+
 
 '*****************************************************************************************
 '*****************************************************************************************
