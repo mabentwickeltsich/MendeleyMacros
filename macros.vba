@@ -163,16 +163,16 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                     'gets the matches (all entries in the citation .Data according to the regular expression)
                     '(used to find the entry in the bibliography)
                     Set colMatchesCitationData = objRegExpCitationData.Execute(sectionField.Code)
-                    
+
                     'resets the position (current citation entry being treated)
                     intCitationEntryPosition = 1
-                    
+
                     'treats all matches (all entries in citation) to generate hyperlinks
                     For Each objMatchCitation In colMatchesCitation
                         'I COULD NOT FIND A MORE EFFICIENT WAY TO SELECT EVERY REFERENCE
                         'IN ORDER TO CREATE THE LINK:
                         'Start: Needs re-work
-                        
+
                         'flag to find the position of the current citation entry
                         blnCitationEntryPositionFound = False
 
@@ -235,7 +235,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         If blnReferenceEntryFound Then
                             'selects the current field (Mendeley's citation field)
                             sectionField.Select
-    
+
                             'finds the opening parenthesis (first character of the field),
                             'used to select something inside the field
                             With Selection.Find
@@ -245,7 +245,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 .Execute
                                 blnCitationEntryFound = .Found
                             End With
-                            
+
                             'if a match was found (it should always find it, but good practice)
                             'selects the correct entry text from the citation field
                             If blnCitationEntryFound Then
@@ -259,7 +259,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     'uses the whole range
                                     Selection.MoveStart Unit:=wdCharacter, Count:=objMatchCitation.FirstIndex
                                 End If
-                                
+
                                 'creates the hyperlink for the current citation entry
                                 'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
                                 'Selection.Fields.Add Range:=Selection.Range, _
@@ -270,7 +270,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 Selection.Hyperlinks.Add Anchor:=Selection.Range, _
                                     Address:="", SubAddress:="SignetBibliographie_" & Format(CStr(i), "00#"), _
                                     ScreenTip:=""
-                            
+
                             End If
                         Else
                             MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!")
@@ -284,7 +284,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         intCitationEntryPosition = intCitationEntryPosition + 1
 
                     Next 'treats all matches (all entries in citation) to generate hyperlinks
-                    
+
                 End If 'checks that the string can be compared
 
             End If 'if it is a citation
@@ -342,7 +342,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
             .Execute
             blnFound = .Found
         End With
-        
+
         'checks if the bibliography is in this section
         If blnFound Then
             'checks all fields
@@ -354,7 +354,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                     Do
                         'selects the current field (Mendeley's citation field)
                         sectionField.Select
-                        
+
                         'finds and selects the text of the number of the reference
                         With Selection.Find
                             .Forward = True
@@ -363,7 +363,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                             .Execute
                             blnReferenceNumberFound = .Found
                         End With
-                        
+
                         'if a number of a reference was found, creates the bookmark with the selected text
                         If blnReferenceNumberFound Then
                             'creates the bookmark
@@ -371,10 +371,10 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                                 Name:="SignetBibliographie_" & Format(CStr(intRefereceNumber), "00#"), _
                                 Range:=Selection.Range
                         End If
-                        
+
                         'continues with the next number
                         intRefereceNumber = intRefereceNumber + 1
-                    
+
                     'while numbers of refereces are found
                     Loop While (blnReferenceNumberFound)
                 End If 'if it is the biblio
@@ -399,7 +399,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
                 'check for all numbers of citations
                 For i = 1 To intRefereceNumber
-                    
+
                     'selects the current field (Mendeley's citation field)
                     sectionField.Select
 
@@ -411,7 +411,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                         .Execute
                         blnCitationNumberFound = .Found
                     End With
-                    
+
                     'if a number of a citation was found, inserts the hyperlink
                     If blnCitationNumberFound Then
                         'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
@@ -467,9 +467,9 @@ Sub GAUG_removeHyperlinksForCitations()
                 GAUG_getUndoEditButton().Execute
             End If
         Next
-        
-        
-        
+
+
+
         'checks if the section has text with style "Titre de dernière section"
         '(it is a section not belonging to any chapter after the sections of parts and chapters)
         blnFound = False
@@ -478,7 +478,7 @@ Sub GAUG_removeHyperlinksForCitations()
             .Execute
             blnFound = .Found
         End With
-        
+
         'checks if the bibliography is in this section
         If blnFound Then
             For Each sectionField In documentSection.Range.Fields
@@ -493,7 +493,7 @@ Sub GAUG_removeHyperlinksForCitations()
                 End If
             Next
         End If
-        
+
     Next
 
 End Sub
@@ -513,9 +513,9 @@ End Sub
 '*****************************************************************************************
 '*****************************************************************************************
 Function GAUG_getUndoEditButton() As CommandBarButton 'copied from Mendeley's plugin function "getUndoEditButton"
-    
+
     Dim mendeleyControl As CommandBarControl
-    
+
     For Each mendeleyControl In CommandBars("Mendeley Toolbar").Controls
         If mendeleyControl.Caption = "Undo Edit" Then
             Set GAUG_getUndoEditButton = mendeleyControl
