@@ -145,7 +145,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     objRegExpCitation.Global = True
     objRegExpCitationData.Global = True
     objRegExpBiblioEntry.Global = True
-    
+
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
         'checks all fields
@@ -366,6 +366,15 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
                         'if a number of a reference was found, creates the bookmark with the selected text
                         If blnReferenceNumberFound Then
+                            'restricts the selection to only the number
+                            With Selection.Find
+                                .Forward = True
+                                .Wrap = wdFindStop
+                                .Text = CStr(intRefereceNumber)
+                                .Execute
+                                blnReferenceNumberFound = .Found
+                            End With
+
                             'creates the bookmark
                             Selection.Bookmarks.Add _
                                 Name:="SignetBibliographie_" & Format(CStr(intRefereceNumber), "00#"), _
@@ -414,6 +423,15 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
                     'if a number of a citation was found, inserts the hyperlink
                     If blnCitationNumberFound Then
+                        'restricts the selection to only the number
+                        With Selection.Find
+                            .Forward = True
+                            .Wrap = wdFindStop
+                            .Text = CStr(i)
+                            .Execute
+                            blnCitationNumberFound = .Found
+                        End With
+
                         'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
                         'Selection.Fields.Add Range:=Selection.Range, _
                         '    Type:=wdFieldEmpty, _
