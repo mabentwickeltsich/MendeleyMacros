@@ -1,7 +1,7 @@
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2016-11-15                                                          **
+'**  Last modified: 2016-12-28                                                          **
 '**                                                                                     **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                         **
 '**                                                                                     **
@@ -32,6 +32,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
 
 
+
+    'disables the screen updating while creating the hyperlinks to increase speed
+    Application.ScreenUpdating = False
 
 '*****************************
 '*   Creation of bookmarks   *
@@ -294,6 +297,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
     Next 'documentSection
 
+    'reenables the screen updating
+    Application.ScreenUpdating = True
+
 End Sub
 
 
@@ -301,7 +307,7 @@ End Sub
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2016-11-15                                                          **
+'**  Last modified: 2016-12-28                                                          **
 '**                                                                                     **
 '**  Sub GAUG_createHyperlinksForCitationsIEEE()                                        **
 '**                                                                                     **
@@ -328,6 +334,9 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
 
 
+
+    'disables the screen updating while creating the hyperlinks to increase speed
+    Application.ScreenUpdating = False
 
 '*****************************
 '*   Creation of bookmarks   *
@@ -448,6 +457,9 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
         Next 'sectionField
     Next 'documentSection
 
+    'reenables the screen updating
+    Application.ScreenUpdating = True
+
 End Sub
 
 
@@ -455,7 +467,7 @@ End Sub
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2016-04-26                                                          **
+'**  Last modified: 2016-12-28                                                          **
 '**                                                                                     **
 '**  Sub GAUG_removeHyperlinksForCitations()                                            **
 '**                                                                                     **
@@ -471,6 +483,8 @@ Sub GAUG_removeHyperlinksForCitations()
     Dim blnFound As Boolean
 
 
+    'disables the screen updating while removing the hyperlinks to increase speed
+    Application.ScreenUpdating = False
 
 '*****************************
 '*  Cleaning old hyperlinks  *
@@ -513,6 +527,9 @@ Sub GAUG_removeHyperlinksForCitations()
         End If
 
     Next
+
+    'reenables the screen updating
+    Application.ScreenUpdating = True
 
 End Sub
 
