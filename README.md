@@ -56,6 +56,8 @@ What you need is to open the file *Mendeley-1.16.1.dotm* located in *C:\Program 
 
 The macro is located in the module *MendeleyLib*. For this, you may have to enable macros for the document when you open it. You may also need to enable the “Developer” tab in Microsoft Word. Once you finish the modifications, save the changes and close Microsoft Word. Open Mendeley Desktop, uninstall the Microsoft Word plugin and reinstall it again for the changes to take effect.
 
+The  `GWDG_*` macros make use of regular expressions; hence you need to enable the RegExp object in Visual Basic for Applications. This can be done from the menu “Tools” | “References” and checking the box next to “Microsoft VBScript Regular Expressions 5.5”.
+
 
 ## Usage
 Execute the desired macro. See also **Extending/modifying the code**.
