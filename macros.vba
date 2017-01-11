@@ -15,12 +15,12 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
     Dim documentSection As Section
     Dim sectionField As Field
-    Dim blnFound, blnReferenceEntryFound, blnCitationEntryFound, blnCitationEntryPositionFound, blnEditorsFound As Boolean
+    Dim blnFound, blnReferenceEntryFound, blnCitationEntryFound, blnCitationEntryPositionFound, blnEditorsFound, blnAuthorsFound As Boolean
     Dim intRefereceNumber, intCitationEntryPosition, i As Integer
-    Dim objRegExpBiblio, objRegExpCitation, objRegExpCitationData, objRegExpBiblioEntry As RegExp
-    Dim colMatchesBiblio, colMatchesCitation, colMatchesCitationData, colMatchesBiblioEntry As MatchCollection
-    Dim objMatchBiblio, objMatchCitation, objMatchCitationData As Match
-    Dim strTempMatch As String
+    Dim objRegExpBiblio, objRegExpCitation, objRegExpCitationData, objRegExpBiblioEntry, objRegExpFindEntry As RegExp
+    Dim colMatchesBiblio, colMatchesCitation, colMatchesCitationData, colMatchesBiblioEntry, colMatchesFindEntry As MatchCollection
+    Dim objMatchBiblio, objMatchCitation, objMatchCitationData, objMatchFindEntry As Match
+    Dim strTempMatch, strLastAuthors, strLastYear As String
 
 
 '*****************************
@@ -132,24 +132,29 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Set objRegExpCitation = New RegExp
     Set objRegExpCitationData = New RegExp
     Set objRegExpBiblioEntry = New RegExp
-    'sets the pattern to match every citation entry (with or without autors) in current field
+    Set objRegExpFindEntry = New RegExp
+    'sets the pattern to match every citation entry (with or without authors) in current field
     '(the year of publication is always present, authors may not be present)
     '(all text non starting by "(" or "," or ";" followed by non digits until a year is found)
     objRegExpCitation.Pattern = "[^(\(|,|;)][^0-9]*\d\d\d\d[a-zA-Z]?"
     'sets the pattern to match every citation entry from the data of the current field
     'original regular expression to get the authors info from Field.Code "((\"id\")|(\"family\")|(\"given\"))\s\:\s\"[^\"]*\""
-    '(all text related to "id", "family" and "given")
+    '(all text related to "id", "family" and "given"), all '\"' were substituted by '\" & Chr(34) & "'
     'objRegExpCitationData.Pattern = "((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & ")|(\" & Chr(34) & "given\" & Chr(34) & "))\s\:\s\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34)
     'updated to separate authors from editors:
-    objRegExpCitationData.Pattern = "(\" & Chr(34) & "editor\" & Chr(34) & "\s:\s)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s\:\s\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & ")"
+    'objRegExpCitationData.Pattern = "(\" & Chr(34) & "editor\" & Chr(34) & "\s:\s)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s\:\s\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & ")"
+    'updated to also include the publication year:
+    objRegExpCitationData.Pattern = "((\" & Chr(34) & "editor\" & Chr(34) & "\s:\s)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s\:\s\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & "))|(\[\s\[\s\" & Chr(34) & "[0-9]+\" & Chr(34) & "\s\]\s\])"
     'sets case insensitivity
     objRegExpCitation.IgnoreCase = False
     objRegExpCitationData.IgnoreCase = False
     objRegExpBiblioEntry.IgnoreCase = False
+    objRegExpFindEntry.IgnoreCase = False
     'sets global applicability
     objRegExpCitation.Global = True
     objRegExpCitationData.Global = True
     objRegExpBiblioEntry.Global = True
+    objRegExpFindEntry.Global = True
 
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
@@ -169,50 +174,115 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                     '(used to find the entry in the bibliography)
                     Set colMatchesCitationData = objRegExpCitationData.Execute(sectionField.Code)
 
-                    'resets the position (current citation entry being treated)
-                    intCitationEntryPosition = 1
-
                     'treats all matches (all entries in citation) to generate hyperlinks
                     For Each objMatchCitation In colMatchesCitation
                         'I COULD NOT FIND A MORE EFFICIENT WAY TO SELECT EVERY REFERENCE
                         'IN ORDER TO CREATE THE LINK:
                         'Start: Needs re-work
 
-                        'flag to find the position of the current citation entry
-                        blnCitationEntryPositionFound = False
+                        'when citations are merged, they are ordered by the authors' family names
+                        'the position of the citation in the visible text may not correspond to the position in the citation hidden data,
+                        'we need to find the entry, but we may not have the authors's family names :(
 
-                        'flag to skip the name of the editors
-                        blnEditorsFound = False
+                        'if the current match has authors's family names (not only the year)
+                        'we keep them stored for future use if needed
+                        If Len(Trim(objMatchCitation.Value)) > 6 Then 'includes ", " before the year
+                            strLastAuthors = objMatchCitation.Value
+                            'removes the last character that could be a letter, the next loop will finish removing the year
+                            strLastAuthors = Left(strLastAuthors, Len(strLastAuthors) - 1)
+                        End If
+                        'removes the years to leave only the authors's family names
+                        Do While IsNumeric(Right(strLastAuthors, 1)) Or (Right(strLastAuthors, 1) = ",") Or (Right(strLastAuthors, 1) = " ")
+                            strLastAuthors = Left(strLastAuthors, Len(strLastAuthors) - 1)
+                        Loop
+                        strLastAuthors = Trim(strLastAuthors) '"et al." may still be in the string, but we need it that way
 
-                        'gets the data from current citation entry to build the pattern to find the reference entry in biblio
-                        objRegExpBiblioEntry.Pattern = ""
-                        For Each objMatchCitationData In colMatchesCitationData
-                            'activates the flag only if in current citation entry
-                            'if the current citation entry starts/ends here ("id" : "ITEM-X")
-                            If objMatchCitationData.Value = Chr(34) & "id" & Chr(34) & " : " & Chr(34) & "ITEM-" & CStr(intCitationEntryPosition) & Chr(34) Then
-                                blnCitationEntryPositionFound = Not blnCitationEntryPositionFound
-                            Else
-                                If blnCitationEntryPositionFound Then
-                                    'if the "editor" names start here
-                                    If objMatchCitationData.Value = Chr(34) & "editor" & Chr(34) & " : " Then
-                                        blnEditorsFound = True
+
+                        'iterates to find all ("id" : "ITEM-X") in colMatchesCitationData to identify where the citation is located
+                        For intCitationEntryPosition = 1 To colMatchesCitation.Count
+
+                            'flag to find the position of the current citation entry
+                            blnCitationEntryPositionFound = False
+
+                            'flag to skip the name of the editors
+                            blnEditorsFound = False
+
+                            'initializes the regular expressions
+                            objRegExpBiblioEntry.Pattern = ""
+                            objRegExpFindEntry.Pattern = ""
+
+                            'gets the data from current citation entry to build the pattern to find the reference entry in biblio
+                            For Each objMatchCitationData In colMatchesCitationData
+                                'activates the flag only if in current citation entry
+                                'if the current citation entry starts/ends here ("id" : "ITEM-X")
+                                If objMatchCitationData.Value = Chr(34) & "id" & Chr(34) & " : " & Chr(34) & "ITEM-" & CStr(intCitationEntryPosition) & Chr(34) Then
+                                    blnCitationEntryPositionFound = Not blnCitationEntryPositionFound
+                                Else
+                                    If blnCitationEntryPositionFound Then
+                                        'if the "editor" names start here
+                                        If objMatchCitationData.Value = Chr(34) & "editor" & Chr(34) & " : " Then
+                                            blnEditorsFound = True
+                                        Else
+                                            'if the names are the author's names
+                                            If Not blnEditorsFound Then
+                                                'gets the last name of the author and adds it to the regular expression
+                                                objRegExpBiblioEntry.Pattern = objRegExpBiblioEntry.Pattern & Replace(Mid(objMatchCitationData.Value, InStr(objMatchCitationData.Value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
+                                                'creates another patterns to match the citation entry with the citation data, they are not in the same position as thought
+                                                objRegExpFindEntry.Pattern = objRegExpFindEntry.Pattern & Replace(Mid(objMatchCitationData.Value, InStr(objMatchCitationData.Value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
+                                                If Not blnAuthorsFound Then
+                                                    'includes the part to check for "et al."
+                                                    objRegExpFindEntry.Pattern = objRegExpFindEntry.Pattern & "((et al\..*)|("
+                                                End If
+                                                'authors were found, we can start searching for the year of publication
+                                                blnAuthorsFound = True
+                                            End If
+                                        End If
                                     Else
-                                        'if the names are the author's names
-                                        If Not blnEditorsFound Then
-                                            'gets the last name of the author and adds it to the regular expression
-                                            objRegExpBiblioEntry.Pattern = objRegExpBiblioEntry.Pattern & Replace(Mid(objMatchCitationData.Value, InStr(objMatchCitationData.Value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
+                                        'gets the year of the publication, it is after the entry ends in ("id" : "ITEM-X")
+                                        If blnAuthorsFound And Left(objMatchCitationData.Value, 5) = "[ [ " & Chr(34) And Right(objMatchCitationData.Value, 5) = Chr(34) & " ] ]" Then
+                                            strLastYear = Mid(objMatchCitationData.Value, 6, Len(objMatchCitationData.Value) - 10)
+                                            'finishes the pattern including the year and checking if there are more than one author
+                                            'if only one author, then removes "et al." from the pattern
+                                            If Right(objRegExpFindEntry.Pattern, 2) = "|(" Then
+                                                objRegExpFindEntry.Pattern = Left(objRegExpFindEntry.Pattern, Len(objRegExpFindEntry.Pattern) - 14)
+                                                objRegExpFindEntry.Pattern = objRegExpFindEntry.Pattern & strLastYear
+                                            Else
+                                                objRegExpFindEntry.Pattern = objRegExpFindEntry.Pattern & "))" & strLastYear
+                                            End If
+                                            blnAuthorsFound = False
                                         End If
                                     End If
                                 End If
+
+                            Next 'gets the data from current citation entry to build the pattern to find the reference entry in biblio
+
+                            'gets the matches, if any, to check if this reference entry corresponds to the citation being treated
+                            If Len(Trim(objMatchCitation.Value)) > 6 Then 'includes ", " before the year
+                                Set colMatchesFindEntry = objRegExpFindEntry.Execute(objMatchCitation.Value)
+                            Else
+                                Set colMatchesFindEntry = objRegExpFindEntry.Execute(strLastAuthors & ", " & objMatchCitation.Value)
+                            End If
+                            'if the this is the corresponding reference entry
+                            If colMatchesFindEntry.Count > 0 Then
+                                Exit For
                             End If
 
-                        Next
+                        Next 'iterates to find all ("id" : "ITEM-X") in colMatchesCitationData to identify where the citation is located
+
 
                         'adds the year of current citation entry
+                        'we include the year from objMatchCitation (the visible text in the document) because
+                        'it may also include a letter in the end (e.g. "2017a") and we need that letter
                         If Mid(objMatchCitation.Value, Len(objMatchCitation.Value) - 4, 1) = " " Then
                             objRegExpBiblioEntry.Pattern = objRegExpBiblioEntry.Pattern & "\(" & Right(objMatchCitation.Value, 4) & "\)"
                         Else
                             objRegExpBiblioEntry.Pattern = objRegExpBiblioEntry.Pattern & "\(" & Right(objMatchCitation.Value, 5) & "\)"
+                        End If
+
+                        'last verification to make sure we found the citation and not because the for loop reached the end
+                        If colMatchesFindEntry.Count = 0 Then
+                            'cleans the regular expression as no entries were found
+                            objRegExpBiblioEntry.Pattern = "Error: Citation not found"
                         End If
 
                         'at this point, the regular expression to find the entry in the biblio is ready
@@ -279,14 +349,12 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             End If
                         Else
                             MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!")
+                            'MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!" & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Regular expression (DATA):" & vbCrLf & vbCrLf & objRegExpBiblioEntry.Pattern & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Authors (DOCUMENT):" & vbCrLf & vbCrLf & strLastAuthors & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Year of publication (DATA):" & vbCrLf & vbCrLf & strLastYear & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Pattern to find entry (DATA):" & vbCrLf & vbCrLf & objRegExpFindEntry.Pattern)
                         End If
 
                         'Ends: Needs re-work
 
                         'at this point current citation entry is linked to corresponding reference in bilio
-
-                        'continues with the next position (next citation entry)
-                        intCitationEntryPosition = intCitationEntryPosition + 1
 
                     Next 'treats all matches (all entries in citation) to generate hyperlinks
 
@@ -324,7 +392,10 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     Dim documentSection As Section
     Dim sectionField As Field
     Dim blnFound, blnReferenceNumberFound, blnCitationNumberFound As Boolean
-    Dim intRefereceNumber As Integer
+    Dim intRefereceNumber, intCitationNumber As Integer
+    Dim objRegExpCitation As RegExp
+    Dim colMatchesCitation As MatchCollection
+    Dim objMatchCitation As Match
 
 
 '*****************************
@@ -412,6 +483,16 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*****************************
 '*   Linking the bookmarks   *
 '*****************************
+    'creates the object for regular expressions (to get all entries in current citation, all entries of data in current citation, position of citation entry in biblio)
+    Set objRegExpCitation = New RegExp
+    'sets the pattern to match every citation entry in current field
+    'it should be "[" + Number + "]"
+    objRegExpCitation.Pattern = "\[[0-9]+\]"
+    'sets case insensitivity
+    objRegExpCitation.IgnoreCase = False
+    'sets global applicability
+    objRegExpCitation.Global = True
+
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
         'checks all fields
@@ -419,43 +500,60 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
             'if it is a citation
             If sectionField.Type = wdFieldAddin And Left(sectionField.Code, 18) = "ADDIN CSL_CITATION" Then
 
-                'check for all numbers of citations
-                For i = 1 To intRefereceNumber
+                'selects the current field (Mendeley's citation field)
+                sectionField.Select
 
-                    'selects the current field (Mendeley's citation field)
-                    sectionField.Select
+                'checks that the string can be compared (both, Selection and Field.Code)
+                If objRegExpCitation.Test(Selection) = True Then
+                    'gets the matches (all entries in the citation according to the regular expression)
+                    Set colMatchesCitation = objRegExpCitation.Execute(Selection)
 
-                    'finds and selects the text of the number of the citation
-                    With Selection.Find
-                        .Forward = True
-                        .Wrap = wdFindStop
-                        .Text = "[" & CStr(i) & "]"
-                        .Execute
-                        blnCitationNumberFound = .Found
-                    End With
+                    'treats all matches (all entries in citation) to generate hyperlinks
+                    For Each objMatchCitation In colMatchesCitation
+                        'gets the citation number as integer
+                        'this will also eliminate leading zeros in numbers (in case of manual modifications)
+                        intCitationNumber = CInt(Mid(objMatchCitation.Value, 2, Len(objMatchCitation.Value) - 2))
 
-                    'if a number of a citation was found, inserts the hyperlink
-                    If blnCitationNumberFound Then
-                        'restricts the selection to only the number
-                        With Selection.Find
-                            .Forward = True
-                            .Wrap = wdFindStop
-                            .Text = CStr(i)
-                            .Execute
-                            blnCitationNumberFound = .Found
-                        End With
+                        'to make sure the citation number as text is the same as numeric
+                        'and that the citation number is in the bibliography
+                        If (("[" & CStr(intCitationNumber) & "]") = objMatchCitation.Value) And (intCitationNumber > 0 And intCitationNumber < intRefereceNumber) Then
+                            blnCitationNumberFound = True
+                        Else
+                            blnCitationNumberFound = False
+                        End If
 
-                        'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
-                        'Selection.Fields.Add Range:=Selection.Range, _
-                        '    Type:=wdFieldEmpty, _
-                        '    Text:="REF " & Chr(34) & "SignetBibliographie_" & Format(CStr(i), "00#") & Chr(34) & " \h", _
-                        '    PreserveFormatting:=True
-                        'better to use normal hyperlink:
-                        Selection.Hyperlinks.Add Anchor:=Selection.Range, _
-                            Address:="", SubAddress:="SignetBibliographie_" & Format(CStr(i), "00#"), _
-                            ScreenTip:=""
-                    End If
-                Next 'all numbers of citations
+                        'if a number of a citation was found (shall always find it), inserts the hyperlink
+                        If blnCitationNumberFound Then
+                            'selects the current field (Mendeley's citation field)
+                            sectionField.Select
+
+                            'finds and selects the text of the number of the reference
+                            With Selection.Find
+                                .Forward = True
+                                .Wrap = wdFindStop
+                                .Text = "[" & CStr(intCitationNumber) & "]"
+                                .Execute
+                                blnReferenceNumberFound = .Found
+                            End With
+
+                            'restricts the selection to only the number
+                            Selection.MoveStart Unit:=wdCharacter, Count:=1
+                            Selection.MoveEnd Unit:=wdCharacter, Count:=-1
+
+                            'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
+                            'Selection.Fields.Add Range:=Selection.Range, _
+                            '    Type:=wdFieldEmpty, _
+                            '    Text:="REF " & Chr(34) & "SignetBibliographie_" & Format(CStr(intCitationNumber), "00#") & Chr(34) & " \h", _
+                            '    PreserveFormatting:=True
+                            'better to use normal hyperlink:
+                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                Address:="", SubAddress:="SignetBibliographie_" & Format(CStr(intCitationNumber), "00#"), _
+                                ScreenTip:=""
+                        Else
+                            MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!")
+                        End If
+                    Next 'treats all matches (all entries in citation) to generate hyperlinks
+                End If 'checks that the string can be compared
 
             End If 'if it is a citation
         Next 'sectionField
