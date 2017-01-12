@@ -1,7 +1,7 @@
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-01-11                                                          **
+'**  Last modified: 2017-01-12                                                          **
 '**                                                                                     **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                         **
 '**                                                                                     **
@@ -45,7 +45,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Set objRegExpBiblio = New RegExp
     'sets the pattern to match every reference in bibliography (it may include character of carriage return)
     '(all text from the beginning of the string or carriage return until a year between parentheses is found)
-    objRegExpBiblio.Pattern = "((^)|(\r))[^(\r)]*\(\d\d\d\d[a-zA-Z]?\)"
+    'objRegExpBiblio.Pattern = "((^)|(\r))[^(\r)]*\(\d\d\d\d[a-zA-Z]?\)"
+    'updated to include "(Ed.)" and "(Eds.)" when editors are used for the citations and bibliography
+    objRegExpBiblio.Pattern = "((^)|(\r))[^(\r)]*(\(Eds?\.\)\.\s)?\(\d\d\d\d[a-zA-Z]?\)"
     'sets case insensitivity
     objRegExpBiblio.IgnoreCase = False
     'sets global applicability
@@ -219,22 +221,28 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     blnCitationEntryPositionFound = Not blnCitationEntryPositionFound
                                 Else
                                     If blnCitationEntryPositionFound Then
-                                        'if the "editor" names start here
+                                        'if the "editor" names start here, sets the flag to stop adding them
                                         If objMatchCitationData.Value = Chr(34) & "editor" & Chr(34) & " : " Then
-                                            blnEditorsFound = True
+                                            'but if no authors were found (like with a book with only editors), then the flag is not set because the editors are used for the citation
+                                            If Len(objRegExpFindEntry.Pattern) > 0 Then
+                                                blnEditorsFound = True
+                                            End If
                                         Else
-                                            'if the names are the author's names
-                                            If Not blnEditorsFound Then
-                                                'gets the last name of the author and adds it to the regular expression
-                                                objRegExpBiblioEntry.Pattern = objRegExpBiblioEntry.Pattern & Replace(Mid(objMatchCitationData.Value, InStr(objMatchCitationData.Value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
-                                                'creates another patterns to match the citation entry with the citation data, they are not in the same position as thought
-                                                objRegExpFindEntry.Pattern = objRegExpFindEntry.Pattern & Replace(Mid(objMatchCitationData.Value, InStr(objMatchCitationData.Value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
-                                                If Not blnAuthorsFound Then
-                                                    'includes the part to check for "et al."
-                                                    objRegExpFindEntry.Pattern = objRegExpFindEntry.Pattern & "((et al\..*)|("
+                                            'skips the year related to "accessed" that may be between start/end of current ("id" : "ITEM-X")
+                                            If Not (Left(objMatchCitationData.Value, 5) = "[ [ " & Chr(34) And Right(objMatchCitationData.Value, 5) = Chr(34) & " ] ]") Then
+                                                'if the names are the author's names
+                                                If Not blnEditorsFound Then
+                                                    'gets the last name of the author and adds it to the regular expression
+                                                    objRegExpBiblioEntry.Pattern = objRegExpBiblioEntry.Pattern & Replace(Mid(objMatchCitationData.Value, InStr(objMatchCitationData.Value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
+                                                    'creates another patterns to match the citation entry with the citation data, they are not in the same position as thought
+                                                    objRegExpFindEntry.Pattern = objRegExpFindEntry.Pattern & Replace(Mid(objMatchCitationData.Value, InStr(objMatchCitationData.Value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
+                                                    If Not blnAuthorsFound Then
+                                                        'includes the part to check for "et al."
+                                                        objRegExpFindEntry.Pattern = objRegExpFindEntry.Pattern & "((et al\..*)|("
+                                                    End If
+                                                    'authors were found, we can start searching for the year of publication
+                                                    blnAuthorsFound = True
                                                 End If
-                                                'authors were found, we can start searching for the year of publication
-                                                blnAuthorsFound = True
                                             End If
                                         End If
                                     Else
@@ -262,8 +270,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             Else
                                 Set colMatchesFindEntry = objRegExpFindEntry.Execute(strLastAuthors & ", " & objMatchCitation.Value)
                             End If
-                            'if the this is the corresponding reference entry
+                            'if this is the corresponding reference entry
                             If colMatchesFindEntry.Count > 0 Then
+                                'MsgBox ("Match between DOCUMENT and DATA found:" & vbCrLf & vbCrLf & colMatchesFindEntry.Item(0).Value)
                                 Exit For
                             End If
 
@@ -292,6 +301,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         'finds the position of the citation entry in the list of references in the biblio
                         blnReferenceEntryFound = False
                         For Each objMatchBiblio In colMatchesBiblio
+                            'MsgBox ("Searching for citation in bibliography:" & vbCrLf & vbCrLf & "Using..." & vbCrLf & objRegExpBiblioEntry.Pattern & vbCrLf & objMatchBiblio.Value)
                             'gets the matches, if any, to check if this reference entry corresponds to the citation being treated
                             Set colMatchesBiblioEntry = objRegExpBiblioEntry.Execute(objMatchBiblio.Value)
                             'if the this is the corresponding reference entry
@@ -308,6 +318,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
                         'if reference entry was found (shall always find it), creates the hyperlink
                         If blnReferenceEntryFound Then
+                            'MsgBox ("Citation was found in the bibliography" & vbCrLf & vbCrLf & colMatchesBiblioEntry.Item(0).Value)
                             'selects the current field (Mendeley's citation field)
                             sectionField.Select
 
@@ -349,7 +360,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             End If
                         Else
                             MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!")
-                            'MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!" & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Regular expression (DATA):" & vbCrLf & vbCrLf & objRegExpBiblioEntry.Pattern & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Authors (DOCUMENT):" & vbCrLf & vbCrLf & strLastAuthors & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Year of publication (DATA):" & vbCrLf & vbCrLf & strLastYear & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Pattern to find entry (DATA):" & vbCrLf & vbCrLf & objRegExpFindEntry.Pattern)
+                            'MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!" & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Regular expression to find reference in bibliography (from DATA and year from DOCUMENT):" & vbCrLf & vbCrLf & objRegExpBiblioEntry.Pattern & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Last authors (from DOCUMENT):" & vbCrLf & vbCrLf & strLastAuthors & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Year of publication (from DATA):" & vbCrLf & vbCrLf & strLastYear & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Pattern to find matching between DOCUMENT and DATA (DATA):" & vbCrLf & vbCrLf & objRegExpFindEntry.Pattern)
                         End If
 
                         'Ends: Needs re-work
