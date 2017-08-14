@@ -1,7 +1,7 @@
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-01-12                                                          **
+'**  Last modified: 2017-08-14                                                          **
 '**                                                                                     **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                         **
 '**                                                                                     **
@@ -21,6 +21,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim colMatchesBiblio, colMatchesCitation, colMatchesCitationData, colMatchesBiblioEntry, colMatchesFindEntry As MatchCollection
     Dim objMatchBiblio, objMatchCitation, objMatchCitationData, objMatchFindEntry As Match
     Dim strTempMatch, strLastAuthors, strLastYear As String
+    Dim strTypeOfExecution As String
 
 
 '*****************************
@@ -28,7 +29,10 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 '*****************************
     'possible values are "RemoveHyperlinks", "CleanEnvironment" and "CleanFullEnvironment"
     'SEE DOCUMENTATION
-    Call GAUG_removeHyperlinksForCitations("RemoveHyperlinks")
+    strTypeOfExecution = "RemoveHyperlinks"
+
+    'removes all hyperlinks
+    Call GAUG_removeHyperlinksForCitations(strTypeOfExecution)
 
 
 
@@ -365,7 +369,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
                         'Ends: Needs re-work
 
-                        'at this point current citation entry is linked to corresponding reference in bilio
+                        'at this point current citation entry is linked to corresponding reference in biblio
 
                     Next 'treats all matches (all entries in citation) to generate hyperlinks
 
@@ -374,7 +378,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
             End If 'if it is a citation
         Next 'sectionField
 
-        'at this point all citations are linked to their corresponding reference in bilio
+        'at this point all citations are linked to their corresponding reference in biblio
 
     Next 'documentSection
 
@@ -388,7 +392,7 @@ End Sub
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-01-11                                                          **
+'**  Last modified: 2017-08-14                                                          **
 '**                                                                                     **
 '**  Sub GAUG_createHyperlinksForCitationsIEEE()                                        **
 '**                                                                                     **
@@ -407,6 +411,21 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     Dim objRegExpCitation As RegExp
     Dim colMatchesCitation As MatchCollection
     Dim objMatchCitation As Match
+    Dim blnIncludeSquareBracketsInHyperlinks As Boolean
+    Dim strTypeOfExecution As String
+
+
+'*****************************
+'*   Custom configuration    *
+'*****************************
+    'possible values are True and False
+    'SEE DOCUMENTATION
+    'if set to True, then argument "RemoveHyperlinks" cannot be used when cleaning old hyperlinks
+    blnIncludeSquareBracketsInHyperlinks = False
+
+
+
+
 
 
 '*****************************
@@ -414,7 +433,24 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*****************************
     'possible values are "RemoveHyperlinks", "CleanEnvironment" and "CleanFullEnvironment"
     'SEE DOCUMENTATION
-    Call GAUG_removeHyperlinksForCitations("RemoveHyperlinks")
+    strTypeOfExecution = "RemoveHyperlinks"
+
+    'checks for conflicts (square brackets and removal of hyperlinks)
+    If blnIncludeSquareBracketsInHyperlinks And strTypeOfExecution = "RemoveHyperlinks" Then
+        MsgBox "The hyperlinks will include the square brackets and" & vbCrLf & _
+        "Microsoft Word does not like them this way." & vbCrLf & vbCrLf & _
+        "You can still continue, but please use the macro" & vbCrLf & _
+        "GAUG_removeHyperlinksForCitations() with argument " & vbCrLf & _
+        Chr(34) & "CleanEnvironment" & Chr(34) & " or " & _
+        Chr(34) & "CleanFullEnvironment" & Chr(34) & "." & vbCrLf, _
+        vbOKOnly, "Cannot continue creating hyperlinks"
+
+        'stops the execution
+        End
+    End If
+
+    'removes all hyperlinks
+    Call GAUG_removeHyperlinksForCitations(strTypeOfExecution)
 
 
 
@@ -461,14 +497,17 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
                         'if a number of a reference was found, creates the bookmark with the selected text
                         If blnReferenceNumberFound Then
-                            'restricts the selection to only the number
-                            With Selection.Find
-                                .Forward = True
-                                .Wrap = wdFindStop
-                                .Text = CStr(intRefereceNumber)
-                                .Execute
-                                blnReferenceNumberFound = .Found
-                            End With
+                            'if the square brackets are not part of the hyperlinks
+                            If Not blnIncludeSquareBracketsInHyperlinks Then
+                                'restricts the selection to only the number
+                                With Selection.Find
+                                    .Forward = True
+                                    .Wrap = wdFindStop
+                                    .Text = CStr(intRefereceNumber)
+                                    .Execute
+                                    blnReferenceNumberFound = .Found
+                                End With
+                            End If
 
                             'creates the bookmark
                             Selection.Bookmarks.Add _
@@ -547,9 +586,12 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                                 blnReferenceNumberFound = .Found
                             End With
 
-                            'restricts the selection to only the number
-                            Selection.MoveStart Unit:=wdCharacter, Count:=1
-                            Selection.MoveEnd Unit:=wdCharacter, Count:=-1
+                            'if the square brackets are not part of the hyperlinks
+                            If Not blnIncludeSquareBracketsInHyperlinks Then
+                                'restricts the selection to only the number
+                                Selection.MoveStart Unit:=wdCharacter, Count:=1
+                                Selection.MoveEnd Unit:=wdCharacter, Count:=-1
+                            End If
 
                             'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
                             'Selection.Fields.Add Range:=Selection.Range, _
@@ -580,7 +622,7 @@ End Sub
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-01-11                                                          **
+'**  Last modified: 2017-08-14                                                          **
 '**                                                                                     **
 '**  Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String)                **
 '**                                                                                     **
@@ -637,8 +679,14 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
             'gets the Undo Edit Button
             Set cbbUndoEditButton = Application.Run("MendeleyLib.getUndoEditButton") 'MabEntwickeltSich: This is the way to call the macro directly from Mendeley
         Case Else
+            'reenables the screen updating
+            Application.ScreenUpdating = True
+
+            MsgBox "Unknown execution type " & Chr(34) & strTypeOfExecution & Chr(34) & " for GAUG_removeHyperlinksForCitations()." & vbCrLf & vbCrLf & _
+            "Please, correct the error and try again.", vbOKOnly, "Invalid argument"
+
             'the execution option is not correct
-            Exit Sub
+            End
         End Select
 
 '*****************************
@@ -656,8 +704,25 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
                     Case "RemoveHyperlinks"
                         'gets all hyperlinks from selection
                         Set selectionHyperlinks = Selection.Hyperlinks
+
                         'deletes all hyperlinks
                         For i = selectionHyperlinks.Count To 1 Step -1
+                            'this method produces errors if the hyperlinks include the square brackets in IEEE
+                            If Left(selectionHyperlinks(1).Range.Text, 1) = "[" Then
+                                MsgBox "There was an error removing the hyperlinks because they include the square brackets." & vbCrLf & _
+                                "Microsoft Word does not like them this way." & vbCrLf & vbCrLf & _
+                                "Please, use the macro GAUG_removeHyperlinksForCitations() with argument " & vbCrLf & _
+                                Chr(34) & "CleanEnvironment" & Chr(34) & " or " & _
+                                Chr(34) & "CleanFullEnvironment" & Chr(34) & "." & vbCrLf & _
+                                "You can also call the respective wrapper function.", vbOKOnly, "Cannot remove hyperlinks"
+
+                                'reenables the screen updating
+                                Application.ScreenUpdating = True
+
+                                'stops the execution
+                                End
+                            End If
+
                             'deletes the current hyperlink
                             selectionHyperlinks(1).Delete
                         Next
