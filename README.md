@@ -16,7 +16,7 @@ José Luis González García
 
 > The parameter `strTypeOfExecution` can have one of three different values:
 > * `"RemoveHyperlinks"`:
-> UNEXPECTED RESULTS IF MANUAL MODIFICATIONS EXIST, BUT THE FASTEST. Removes the bookmarks and hyperlinks. Manual modifications to citations and bibliography will remain intact.
+> UNEXPECTED RESULTS IF MANUAL MODIFICATIONS EXIST, BUT THE FASTEST. Removes the bookmarks and hyperlinks. Manual modifications to citations and bibliography will remain intact. This value CANNOT be used if the square brackets are part of the hyperlinks in the IEEE CSL citation style.
 > * `"CleanEnvironment"`:
 > EXPERIMENTAL, BUT VERY FAST. Removes the bookmarks and hyperlinks. Manual modifications to citations and bibliography will also be removed to have a clean environment
 > * `"CleanFullEnvironment"`:
@@ -49,6 +49,8 @@ José Luis González García
 
 > **Important:** It works ONLY with the IEEE CSL citation style installed with Mendeley. It MAY not work if you make manual modifications to the citation fields, bibliography or IEEE CSL citation style.
 
+> **NOTE:** There is a configuration flag used to prevent the square brackets from being part of the hyperlinks. The flag is in the Custom configuration section. Setting `blnIncludeSquareBracketsInHyperlinks=True` will include the square brackets as part of the hyperlinks. BE AWARE that Microsoft Word DOES NOT handle this kind of hyperlinks very well and it is not possible to remove them with the argument `"RemoveHyperlinks"` or the wrapper `GAUG_removeHyperlinks`.
+
 #### GAUG_getUndoEditButton
 > This is a copy of the original macro installed with Mendeley located in *Mendeley-1.16.1.dotm* (file name depends on the version of Mendeley), but I could not call it from my own macros.
 
@@ -62,17 +64,21 @@ José Luis González García
 > **Important:** This macro will NOT work out if its context. This is just to show what modifications have to be made to the original macro installed by Mendeley's plugin.
 
 ## Installation
-Copy the code to your Microsoft Word macros to install any of the `GWDG_*` macros.
+Copy the code to your Microsoft Word macros to install any of the `GWDG_*` macros. See note below if using a Mac!
 
-To install `refreshDocument` macro you need to modify the original macro by inserting the three extra lines with the comment `'MabEntwickeltSich`:
+The  `GWDG_*` macros make use of regular expressions; hence you need to enable the RegExp object in Visual Basic for Applications. This can be done from the menu “Tools” | “References” and checking the box next to “Microsoft VBScript Regular Expressions 5.5”.
 
-What you need is to open the file *Mendeley-1.16.1.dotm* located in *C:\Program Files\Mendeley Desktop\wordPlugin* (check your own installation, your version of Mendeley may be different) and modify the macro:
+To install the `refreshDocument` macro you need to modify the original macro by inserting the three extra lines with the comment `'MabEntwickeltSich`:
+
+What you need to do is to open the file *Mendeley-1.16.1.dotm* (or *Mendeley-word201\*-1.16.1.dot* on a Mac) located in *C:\Program Files\Mendeley Desktop\wordPlugin* (or */Applications/Mendeley Desktop.app/Contents/Resources/macWordPlugin/word201\** on a Mac). Check your own installation, your version of Mendeley may be different. Then modify the macro:
 
 `Function refreshDocument(Optional openingDocument As Boolean = False) As Boolean`
 
 The macro is located in the module *MendeleyLib*. For this, you may have to enable macros for the document when you open it. You may also need to enable the “Developer” tab in Microsoft Word. Once you finish the modifications, save the changes and close Microsoft Word. Open Mendeley Desktop, uninstall the Microsoft Word plugin and reinstall it again for the changes to take effect.
 
-The  `GWDG_*` macros make use of regular expressions; hence you need to enable the RegExp object in Visual Basic for Applications. This can be done from the menu “Tools” | “References” and checking the box next to “Microsoft VBScript Regular Expressions 5.5”.
+**A sad note for Mac users**
+
+The current versions of `GAUG_createHyperlinksForCitationsAPA` and `GAUG_createHyperlinksForCitationsIEEE` make use of regular expressions which are not available on Mac OS X. HOWEVER, there is hope if you need the hyperlinks for the IEEE CSL citation style. Commit [6289273](https://github.com/mabentwickeltsich/MendeleyMacros/tree/6289273e87c2ab233ef9de91c27433519e4ca27f) has an old version of `GAUG_createHyperlinksForCitationsIEEE` without regular expressions which you can still use. Follow the standard installation.
 
 
 ## Usage
