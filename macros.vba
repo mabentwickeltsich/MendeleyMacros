@@ -1,13 +1,15 @@
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-08-14                                                          **
+'**  Last modified: 2019-03-04                                                          **
 '**                                                                                     **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                         **
 '**                                                                                     **
 '**  Generates the bookmarks in the bibliography inserted by Mendeley's plugin.         **
 '**  Links the citations inserted by Mendeley's plugin to the corresponding entry       **
 '**     in the bibliography inserted by Mendeley's plugin.                              **
+'**  Generates the hyperlinks for the URLs in the bibliography inserted by              **
+'**     Mendeley's plugin.                                                              **
 '**  Only for APA CSL citation style.                                                   **
 '*****************************************************************************************
 '*****************************************************************************************
@@ -15,22 +17,89 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
     Dim documentSection As Section
     Dim sectionField As Field
-    Dim blnFound, blnReferenceEntryFound, blnCitationEntryFound, blnCitationEntryPositionFound, blnEditorsFound, blnAuthorsFound As Boolean
+    Dim blnFound, blnBibliographyFound, blnReferenceEntryFound, blnCitationEntryFound, blnCitationEntryPositionFound, blnEditorsFound, blnAuthorsFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
     Dim intRefereceNumber, intCitationEntryPosition, i As Integer
-    Dim objRegExpBiblio, objRegExpCitation, objRegExpCitationData, objRegExpBiblioEntry, objRegExpFindEntry As RegExp
-    Dim colMatchesBiblio, colMatchesCitation, colMatchesCitationData, colMatchesBiblioEntry, colMatchesFindEntry As MatchCollection
-    Dim objMatchBiblio, objMatchCitation, objMatchCitationData, objMatchFindEntry As Match
+    Dim objRegExpBiblio, objRegExpCitation, objRegExpCitationData, objRegExpBiblioEntry, objRegExpFindEntry, objRegExpURL As RegExp
+    Dim colMatchesBiblio, colMatchesCitation, colMatchesCitationData, colMatchesBiblioEntry, colMatchesFindEntry, colMatchesURL As MatchCollection
+    Dim objMatchBiblio, objMatchCitation, objMatchCitationData, objMatchFindEntry, objMatchURL As Match
     Dim strTempMatch, strLastAuthors, strLastYear As String
     Dim strTypeOfExecution As String
+    Dim blnMabEntwickeltSich As Boolean
+    Dim stlStyleInDocument As Word.Style
+    Dim strStyleForTitleOfBibliography As String
+    Dim blnStyleForTitleOfBibliographyFound As Boolean
+    Dim strURL As String
+    Dim arrNonDetectedURLs, varNonDetectedURL As Variant
+
+
+'*****************************
+'*   Custom configuration    *
+'*****************************
+    'SEE DOCUMENTATION
+    'specifies the name of the font style used for the title of the bibliography
+    strStyleForTitleOfBibliography = "Titre de dernière section"
+
+    'possible values are True and False
+    'SEE DOCUMENTATION
+    'set to True if the bibliography is in a section with title in style indicated by strStyleForTitleOfBibliography
+    blnMabEntwickeltSich = False
+
+    'possible values are True and False
+    'SEE DOCUMENTATION
+    'if set to True, then the URLs in the bibliography will be converted to hyperlinks
+    blnGenerateHyperlinksForURLs = True
+
+    'SEE DOCUMENTATION
+    'specifies the URLs, not detected by the regular expression, to generate the hyperlinks in the bibliography
+    'note that the last URL does not have a comma after the double quotation mark
+    arrNonDetectedURLs = _
+        Array( _
+            "http://my.first.sample/url/", _
+            "https://my.second.sample/url/", _
+            "ftp://my.third.sample/url/with/file.pdf" _
+            )
+
+    'possible values are "RemoveHyperlinks", "CleanEnvironment" and "CleanFullEnvironment"
+    'SEE DOCUMENTATION
+    strTypeOfExecution = "RemoveHyperlinks"
+
+
+
+
+
+
+'*****************************
+'*     Initial tasks and     *
+'*       verifications       *
+'*****************************
+    'checks that the style exists in the collection of styles of the document
+    For Each stlStyleInDocument In ActiveDocument.Styles
+        'checks if the current style is the style for the title of the bibliography
+        If stlStyleInDocument = strStyleForTitleOfBibliography Then
+            blnStyleForTitleOfBibliographyFound = True
+        End If
+    Next 'all styles in document
+
+    'if the style was not found
+    If blnMabEntwickeltSich And Not blnStyleForTitleOfBibliographyFound Then
+        MsgBox "The style " & Chr(34) & strStyleForTitleOfBibliography & Chr(34) & " could not be found." & vbCrLf & vbCrLf & _
+        "Add the custom style to Microsoft Word or" & vbCrLf & _
+        "set the flag blnMabEntwickeltSich to False." & vbCrLf & vbCrLf & _
+        "Cannot continue creating hyperlinks.", _
+        vbCritical, "GAUG_createHyperlinksForCitationsAPA()"
+
+        'stops the execution
+        End
+    End If
+
+
+
+
 
 
 '*****************************
 '*  Cleaning old hyperlinks  *
 '*****************************
-    'possible values are "RemoveHyperlinks", "CleanEnvironment" and "CleanFullEnvironment"
-    'SEE DOCUMENTATION
-    strTypeOfExecution = "RemoveHyperlinks"
-
     'removes all hyperlinks
     Call GAUG_removeHyperlinksForCitations(strTypeOfExecution)
 
@@ -57,16 +126,34 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     'sets global applicability
     objRegExpBiblio.Global = True
 
+    'creates the object for regular expressions (to get all URLs in biblio
+    Set objRegExpURL = New RegExp
+    'sets the pattern to match every URL in bibliography
+    objRegExpURL.Pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
+    'sets case insensitivity
+    objRegExpURL.IgnoreCase = False
+    'sets global applicability
+    objRegExpURL.Global = True
+
+    'initializes the flag
+    blnBibliographyFound = False
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
-        'checks if the section has text with style "Titre de dernière section"
-        '(it is a section not belonging to any chapter after the sections of parts and chapters)
-        blnFound = False
-        With documentSection.Range.Find
-            .Style = "Titre de dernière section"
-            .Execute
-            blnFound = .Found
-        End With
+        'if this is MabEntwickeltSich's document structure
+        If blnMabEntwickeltSich Then
+            'checks if the section has text with style indicated by strStyleForTitleOfBibliography
+            '(it is a section not belonging to any chapter after the sections of parts and chapters)
+            blnFound = False
+            With documentSection.Range.Find
+                .Style = strStyleForTitleOfBibliography
+                .Execute
+                blnFound = .Found
+            End With
+        'this is a document by another user
+        Else
+            'forces the macro to search for the bibliography in every section
+            blnFound = True
+        End If
 
         'checks if the bibliography is in this section
         If blnFound Then
@@ -74,6 +161,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
             For Each sectionField In documentSection.Range.Fields
                 'if it is the bibliography
                 If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
+                    blnBibliographyFound = True
                     'start the numbering
                     intRefereceNumber = 1
 
@@ -121,10 +209,109 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                     'by now, we have created all bookmarks and have all entries in colMatchesBiblio
                     'for future use when creating the hyperlinks
 
+                    'generates the hyperlinks for the URLs in the bibliography if required
+                    If blnGenerateHyperlinksForURLs Then
+
+                        'generates the hyperlnks from the list of non detected URLs
+                        'the non detected URLs shall be done first or some conflicts may arise
+                        For Each varNonDetectedURL In arrNonDetectedURLs
+                                'selects the current field (Mendeley's bibliography field)
+                                sectionField.Select
+
+                                'finds all instances of current URL
+                                Do
+                                    'finds and selects the text of the URL
+                                    With Selection.Find
+                                        .Forward = True
+                                        .Wrap = wdFindStop
+                                        .Text = CStr(varNonDetectedURL)
+                                        .Execute
+                                        blnURLFound = .Found
+                                    End With
+
+                                    'creates the hyperlink
+                                    If blnURLFound Then
+                                        'checks there is no hyperlink already
+                                        If Selection.Hyperlinks.Count = 0 Then
+                                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                                Address:=Replace(Trim(CStr(varNonDetectedURL)), " ", "%20"), SubAddress:="", _
+                                                ScreenTip:=""
+                                        End If
+                                    End If
+
+                                Loop Until (Not blnURLFound) 'finds all instances of current URL
+                        Next 'generates the hyperlnks from the list of non detected URLs
+
+                        'selects the current field (Mendeley's bibliography field)
+                        sectionField.Select
+
+                        'checks that the string can be compared (both, Selection and Field.Code)
+                        If objRegExpURL.Test(Selection) = True Then
+                            'gets the matches (all URLs in the biblio according to the regular expression)
+                            Set colMatchesURL = objRegExpURL.Execute(Selection)
+
+                            'treats all matches (all URLs in biblio) to generate hyperlinks
+                            For Each objMatchURL In colMatchesURL
+
+                                'removes the last character if a period (".")
+                                If Right(objMatchURL.Value, 1) = "." Then
+                                    strURL = Left(objMatchURL.Value, Len(objMatchURL.Value) - 1)
+                                Else
+                                    strURL = objMatchURL.Value
+                                End If
+
+                                'selects the current field (Mendeley's bibliography field)
+                                sectionField.Select
+
+                                'finds all instances of current URL
+                                Do
+                                    'finds and selects the text of the URL
+                                    With Selection.Find
+                                        .Forward = True
+                                        .Wrap = wdFindStop
+                                        .Text = strURL
+                                        .Execute
+                                        blnURLFound = .Found
+                                    End With
+
+                                    'creates the hyperlink
+                                    If blnURLFound Then
+                                        'checks there is no hyperlink already
+                                        'this could happen in some cases:
+                                        '     when duplicated URLs in bibliography
+                                        '     when the hyperlink was created with the list of non detected URLs
+                                        '     when a partial URL is detected and the hyperlink was created with the list of non detected URLs
+                                        If Selection.Hyperlinks.Count = 0 Then
+                                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                                Address:=strURL, SubAddress:="", _
+                                                ScreenTip:=""
+                                        End If
+                                    End If
+
+                                Loop Until (Not blnURLFound) 'finds all instances of current URL
+
+                            Next 'treats all matches (all URLs in biblio) to generate hyperlinks
+                        End If 'checks that the string can be compared
+
+                    End If 'hyperlinks for URLs in bibliography
+
                 End If 'if it is the biblio
             Next 'sectionField
         End If
     Next 'documentSection
+
+
+    'if the bibliography could not be located in the document
+    If Not blnBibliographyFound Then
+        MsgBox "The bibliography could not be located in the document." & vbCrLf & vbCrLf & _
+        "Make sure that you have inserted the bibliography via the Mendeley's plugin" & vbCrLf & _
+        "and that the custom configuration of the GWDG_* macros is correct." & vbCrLf & vbCrLf & _
+        "Cannot continue creating hyperlinks.", _
+        vbCritical, "GAUG_createHyperlinksForCitationsAPA()"
+
+        'stops the execution
+        End
+    End If
 
 
 
@@ -363,7 +550,10 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
                             End If
                         Else
-                            MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!")
+                            MsgBox "Orphan citation entry found:" & vbCrLf & vbCrLf & _
+                            objMatchCitation.Value & vbCrLf & vbCrLf & _
+                            "Remove it from document!", _
+                            vbExclamation, "GAUG_createHyperlinksForCitationsAPA()"
                             'MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!" & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Regular expression to find reference in bibliography (from DATA and year from DOCUMENT):" & vbCrLf & vbCrLf & objRegExpBiblioEntry.Pattern & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Last authors (from DOCUMENT):" & vbCrLf & vbCrLf & strLastAuthors & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Year of publication (from DATA):" & vbCrLf & vbCrLf & strLastYear & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Pattern to find matching between DOCUMENT and DATA (DATA):" & vbCrLf & vbCrLf & objRegExpFindEntry.Pattern)
                         End If
 
@@ -392,13 +582,15 @@ End Sub
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-08-14                                                          **
+'**  Last modified: 2019-03-04                                                          **
 '**                                                                                     **
 '**  Sub GAUG_createHyperlinksForCitationsIEEE()                                        **
 '**                                                                                     **
 '**  Generates the bookmarks in the bibliography inserted by Mendeley's plugin.         **
 '**  Links the citations inserted by Mendeley's plugin to the corresponding entry       **
 '**     in the bibliography inserted by Mendeley's plugin.                              **
+'**  Generates the hyperlinks for the URLs in the bibliography inserted by              **
+'**     Mendeley's plugin.                                                              **
 '**  Only for IEEE CSL citation style.                                                  **
 '*****************************************************************************************
 '*****************************************************************************************
@@ -406,22 +598,101 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
     Dim documentSection As Section
     Dim sectionField As Field
-    Dim blnFound, blnReferenceNumberFound, blnCitationNumberFound As Boolean
+    Dim blnFound, blnBibliographyFound, blnReferenceNumberFound, blnCitationNumberFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
     Dim intRefereceNumber, intCitationNumber As Integer
-    Dim objRegExpCitation As RegExp
-    Dim colMatchesCitation As MatchCollection
-    Dim objMatchCitation As Match
+    Dim objRegExpCitation, objRegExpURL As RegExp
+    Dim colMatchesCitation, colMatchesURL As MatchCollection
+    Dim objMatchCitation, objMatchURL As Match
     Dim blnIncludeSquareBracketsInHyperlinks As Boolean
     Dim strTypeOfExecution As String
+    Dim blnMabEntwickeltSich As Boolean
+    Dim stlStyleInDocument As Word.Style
+    Dim strStyleForTitleOfBibliography As String
+    Dim blnStyleForTitleOfBibliographyFound As Boolean
+    Dim strURL As String
+    Dim arrNonDetectedURLs, varNonDetectedURL As Variant
 
 
 '*****************************
 '*   Custom configuration    *
 '*****************************
+    'SEE DOCUMENTATION
+    'specifies the name of the font style used for the title of the bibliography
+    strStyleForTitleOfBibliography = "Titre de dernière section"
+
+    'possible values are True and False
+    'SEE DOCUMENTATION
+    'set to True if the bibliography is in a section with title in style indicated by strStyleForTitleOfBibliography
+    blnMabEntwickeltSich = False
+
+    'possible values are True and False
+    'SEE DOCUMENTATION
+    'if set to True, then the URLs in the bibliography will be converted to hyperlinks
+    blnGenerateHyperlinksForURLs = True
+
+    'SEE DOCUMENTATION
+    'specifies the URLs, not detected by the regular expression, to generate the hyperlinks in the bibliography
+    'note that the last URL does not have a comma after the double quotation mark
+    arrNonDetectedURLs = _
+        Array( _
+            "http://my.first.sample/url/", _
+            "https://my.second.sample/url/", _
+            "ftp://my.third.sample/url/with/file.pdf" _
+            )
+
     'possible values are True and False
     'SEE DOCUMENTATION
     'if set to True, then argument "RemoveHyperlinks" cannot be used when cleaning old hyperlinks
     blnIncludeSquareBracketsInHyperlinks = False
+
+    'possible values are "RemoveHyperlinks", "CleanEnvironment" and "CleanFullEnvironment"
+    'SEE DOCUMENTATION
+    strTypeOfExecution = "RemoveHyperlinks"
+
+
+
+
+
+
+'*****************************
+'*     Initial tasks and     *
+'*       verifications       *
+'*****************************
+    'checks that the style exists in the collection of styles of the document
+    For Each stlStyleInDocument In ActiveDocument.Styles
+        'checks if the current style is the style for the title of the bibliography
+        If stlStyleInDocument = strStyleForTitleOfBibliography Then
+            blnStyleForTitleOfBibliographyFound = True
+        End If
+    Next 'all styles in document
+
+    'if the style was not found
+    If blnMabEntwickeltSich And Not blnStyleForTitleOfBibliographyFound Then
+        MsgBox "The style " & Chr(34) & strStyleForTitleOfBibliography & Chr(34) & " could not be found." & vbCrLf & vbCrLf & _
+        "Add the custom style to Microsoft Word or" & vbCrLf & _
+        "set the flag blnMabEntwickeltSich to False." & vbCrLf & vbCrLf & _
+        "Cannot continue creating hyperlinks.", _
+        vbCritical, "GAUG_createHyperlinksForCitationsIEEE()"
+
+        'stops the execution
+        End
+    End If
+
+
+    'checks for conflicts (square brackets and removal of hyperlinks)
+    If blnIncludeSquareBracketsInHyperlinks And strTypeOfExecution = "RemoveHyperlinks" Then
+        MsgBox "The hyperlinks will include the square brackets and" & vbCrLf & _
+        "Microsoft Word does not like them this way." & vbCrLf & vbCrLf & _
+        "You cannot call the macro GAUG_removeHyperlinksForCitations()" & vbCrLf & _
+        "with argument " & Chr(34) & "RemoveHyperlinks" & Chr(34) & "." & vbCrLf & _
+        "Use " & Chr(34) & "CleanEnvironment" & Chr(34) & " or " & _
+        Chr(34) & "CleanFullEnvironment" & Chr(34) & " instead." & vbCrLf & vbCrLf & _
+        "Cannot continue creating hyperlinks.", _
+        vbCritical, "GAUG_createHyperlinksForCitationsIEEE()"
+
+        'stops the execution
+        End
+    End If
 
 
 
@@ -431,24 +702,6 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*****************************
 '*  Cleaning old hyperlinks  *
 '*****************************
-    'possible values are "RemoveHyperlinks", "CleanEnvironment" and "CleanFullEnvironment"
-    'SEE DOCUMENTATION
-    strTypeOfExecution = "RemoveHyperlinks"
-
-    'checks for conflicts (square brackets and removal of hyperlinks)
-    If blnIncludeSquareBracketsInHyperlinks And strTypeOfExecution = "RemoveHyperlinks" Then
-        MsgBox "The hyperlinks will include the square brackets and" & vbCrLf & _
-        "Microsoft Word does not like them this way." & vbCrLf & vbCrLf & _
-        "You can still continue, but please use the macro" & vbCrLf & _
-        "GAUG_removeHyperlinksForCitations() with argument " & vbCrLf & _
-        Chr(34) & "CleanEnvironment" & Chr(34) & " or " & _
-        Chr(34) & "CleanFullEnvironment" & Chr(34) & "." & vbCrLf, _
-        vbOKOnly, "Cannot continue creating hyperlinks"
-
-        'stops the execution
-        End
-    End If
-
     'removes all hyperlinks
     Call GAUG_removeHyperlinksForCitations(strTypeOfExecution)
 
@@ -463,16 +716,34 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*****************************
 '*   Creation of bookmarks   *
 '*****************************
+    'creates the object for regular expressions (to get all URLs in biblio
+    Set objRegExpURL = New RegExp
+    'sets the pattern to match every URL in bibliography
+    objRegExpURL.Pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
+    'sets case insensitivity
+    objRegExpURL.IgnoreCase = False
+    'sets global applicability
+    objRegExpURL.Global = True
+
+    'initializes the flag
+    blnBibliographyFound = False
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
-        'checks if the section has text with style "Titre de dernière section"
-        '(it is a section not belonging to any chapter after the sections of parts and chapters)
-        blnFound = False
-        With documentSection.Range.Find
-            .Style = "Titre de dernière section"
-            .Execute
-            blnFound = .Found
-        End With
+        'if this is MabEntwickeltSich's document structure
+        If blnMabEntwickeltSich Then
+            'checks if the section has text with style indicated by strStyleForTitleOfBibliography
+            '(it is a section not belonging to any chapter after the sections of parts and chapters)
+            blnFound = False
+            With documentSection.Range.Find
+                .Style = strStyleForTitleOfBibliography
+                .Execute
+                blnFound = .Found
+            End With
+        'this is a document by another user
+        Else
+            'forces the macro to search for the bibliography in every section
+            blnFound = True
+        End If
 
         'checks if the bibliography is in this section
         If blnFound Then
@@ -480,10 +751,11 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
             For Each sectionField In documentSection.Range.Fields
                 'if it is the bibliography
                 If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
+                    blnBibliographyFound = True
                     'start the numbering
                     intRefereceNumber = 1
                     Do
-                        'selects the current field (Mendeley's citation field)
+                        'selects the current field (Mendeley's bibliography field)
                         sectionField.Select
 
                         'finds and selects the text of the number of the reference
@@ -520,10 +792,110 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
                     'while numbers of refereces are found
                     Loop While (blnReferenceNumberFound)
+
+                    'generates the hyperlinks for the URLs in the bibliography if required
+                    If blnGenerateHyperlinksForURLs Then
+
+                        'generates the hyperlnks from the list of non detected URLs
+                        'the non detected URLs shall be done first or some conflicts may arise
+                        For Each varNonDetectedURL In arrNonDetectedURLs
+                                'selects the current field (Mendeley's bibliography field)
+                                sectionField.Select
+
+                                'finds all instances of current URL
+                                Do
+                                    'finds and selects the text of the URL
+                                    With Selection.Find
+                                        .Forward = True
+                                        .Wrap = wdFindStop
+                                        .Text = CStr(varNonDetectedURL)
+                                        .Execute
+                                        blnURLFound = .Found
+                                    End With
+
+                                    'creates the hyperlink
+                                    If blnURLFound Then
+                                        'checks there is no hyperlink already
+                                        If Selection.Hyperlinks.Count = 0 Then
+                                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                                Address:=Replace(Trim(CStr(varNonDetectedURL)), " ", "%20"), SubAddress:="", _
+                                                ScreenTip:=""
+                                        End If
+                                    End If
+
+                                Loop Until (Not blnURLFound) 'finds all instances of current URL
+                        Next 'generates the hyperlnks from the list of non detected URLs
+
+                        'selects the current field (Mendeley's bibliography field)
+                        sectionField.Select
+
+                        'checks that the string can be compared (both, Selection and Field.Code)
+                        If objRegExpURL.Test(Selection) = True Then
+                            'gets the matches (all URLs in the biblio according to the regular expression)
+                            Set colMatchesURL = objRegExpURL.Execute(Selection)
+
+                            'treats all matches (all URLs in biblio) to generate hyperlinks
+                            For Each objMatchURL In colMatchesURL
+
+                                'removes the last character if a period (".")
+                                If Right(objMatchURL.Value, 1) = "." Then
+                                    strURL = Left(objMatchURL.Value, Len(objMatchURL.Value) - 1)
+                                Else
+                                    strURL = objMatchURL.Value
+                                End If
+
+                                'selects the current field (Mendeley's bibliography field)
+                                sectionField.Select
+
+                                'finds all instances of current URL
+                                Do
+                                    'finds and selects the text of the URL
+                                    With Selection.Find
+                                        .Forward = True
+                                        .Wrap = wdFindStop
+                                        .Text = strURL
+                                        .Execute
+                                        blnURLFound = .Found
+                                    End With
+
+                                    'creates the hyperlink
+                                    If blnURLFound Then
+                                        'checks there is no hyperlink already
+                                        'this could happen in some cases:
+                                        '     when duplicated URLs in bibliography
+                                        '     when the hyperlink was created with the list of non detected URLs
+                                        '     when a partial URL is detected and the hyperlink was created with the list of non detected URLs
+                                        If Selection.Hyperlinks.Count = 0 Then
+                                            Selection.Hyperlinks.Add Anchor:=Selection.Range, _
+                                                Address:=strURL, SubAddress:="", _
+                                                ScreenTip:=""
+                                        End If
+                                    End If
+
+                                Loop Until (Not blnURLFound) 'finds all instances of current URL
+
+                            Next 'treats all matches (all URLs in biblio) to generate hyperlinks
+                        End If 'checks that the string can be compared
+
+                    End If 'hyperlinks for URLs in bibliography
+
                 End If 'if it is the biblio
             Next 'sectionField
         End If
     Next 'documentSection
+
+
+    'if the bibliography could not be located in the document
+    If Not blnBibliographyFound Then
+        MsgBox "The bibliography could not be located in the document." & vbCrLf & vbCrLf & _
+        "Make sure that you have inserted the bibliography via the Mendeley's plugin" & vbCrLf & _
+        "and that the custom configuration of the GWDG_* macros is correct." & vbCrLf & vbCrLf & _
+        "Cannot continue creating hyperlinks.", _
+        vbCritical, "GAUG_createHyperlinksForCitationsIEEE()"
+
+        'stops the execution
+        End
+    End If
 
 
 
@@ -603,7 +975,10 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                                 Address:="", SubAddress:="SignetBibliographie_" & Format(CStr(intCitationNumber), "00#"), _
                                 ScreenTip:=""
                         Else
-                            MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchCitation.Value & vbCrLf & vbCrLf & "Remove it from document!")
+                            MsgBox "Orphan citation entry found:" & vbCrLf & vbCrLf & _
+                            objMatchCitation.Value & vbCrLf & vbCrLf & _
+                            "Remove it from document!", _
+                            vbExclamation, "GAUG_createHyperlinksForCitationsIEEE()"
                         End If
                     Next 'treats all matches (all entries in citation) to generate hyperlinks
                 End If 'checks that the string can be compared
@@ -622,7 +997,7 @@ End Sub
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-08-14                                                          **
+'**  Last modified: 2019-03-04                                                          **
 '**                                                                                     **
 '**  Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String)                **
 '**                                                                                     **
@@ -634,6 +1009,8 @@ End Sub
 '**     in the bibliography inserted by Mendeley's plugin.                              **
 '**  Removes the hyperlinks generated by GAUG_createHyperlinksForCitations*             **
 '**     of the citations inserted by Mendeley's plugin.                                 **
+'**  Removes the hyperlinks generated by GAUG_createHyperlinksForCitations*             **
+'**     in the bibliography inserted by Mendeley's plugin.                              **
 '**  Removes all manual modifications to the citations and bibliography if specified    **
 '**                                                                                     **
 '**  Parameter strTypeOfExecution can have three different values:                      **
@@ -659,14 +1036,60 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
     Dim fieldBookmark As Bookmark
     Dim selectionHyperlinks As Hyperlinks
     Dim i As Integer
-    Dim blnFound As Boolean
+    Dim blnFound, blnBibliographyFound As Boolean
     Dim sectionFieldName, sectionFieldNewName As String
     Dim objMendeleyApiClient As Object
     Dim cbbUndoEditButton As CommandBarButton
+    Dim blnMabEntwickeltSich As Boolean
+    Dim stlStyleInDocument As Word.Style
+    Dim strStyleForTitleOfBibliography As String
+    Dim blnStyleForTitleOfBibliographyFound As Boolean
+
+
+'*****************************
+'*   Custom configuration    *
+'*****************************
+    'SEE DOCUMENTATION
+    'specifies the name of the font style used for the title of the bibliography
+    strStyleForTitleOfBibliography = "Titre de dernière section"
+
+    'possible values are True and False
+    'SEE DOCUMENTATION
+    'set to True if the bibliography is in a section with title in style indicated by strStyleForTitleOfBibliography
+    blnMabEntwickeltSich = False
+
+
+
+
 
 
     'disables the screen updating while removing the hyperlinks to increase speed
     Application.ScreenUpdating = False
+
+'*****************************
+'*     Initial tasks and     *
+'*       verifications       *
+'*****************************
+    'checks that the style exists in the collection of styles of the document
+    For Each stlStyleInDocument In ActiveDocument.Styles
+        'checks if the current style is the style for the title of the bibliography
+        If stlStyleInDocument = strStyleForTitleOfBibliography Then
+            blnStyleForTitleOfBibliographyFound = True
+        End If
+    Next 'all styles in document
+
+    'if the style was not found
+    If blnMabEntwickeltSich And Not blnStyleForTitleOfBibliographyFound Then
+        MsgBox "The style " & Chr(34) & strStyleForTitleOfBibliography & Chr(34) & " could not be found." & vbCrLf & vbCrLf & _
+        "Add the custom style to Microsoft Word or" & vbCrLf & _
+        "set the flag blnMabEntwickeltSich to False." & vbCrLf & vbCrLf & _
+        "Cannot continue removing hyperlinks.", _
+        vbCritical, "GAUG_removeHyperlinksForCitations()"
+
+        'stops the execution
+        End
+    End If
+
 
     'selects the type of execution
     Select Case strTypeOfExecution
@@ -683,11 +1106,17 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
             Application.ScreenUpdating = True
 
             MsgBox "Unknown execution type " & Chr(34) & strTypeOfExecution & Chr(34) & " for GAUG_removeHyperlinksForCitations()." & vbCrLf & vbCrLf & _
-            "Please, correct the error and try again.", vbOKOnly, "Invalid argument"
+            "Please, correct the error and try again.", _
+            vbCritical, "GAUG_removeHyperlinksForCitations()"
 
             'the execution option is not correct
             End
         End Select
+
+
+
+
+
 
 '*****************************
 '*  Cleaning old hyperlinks  *
@@ -709,12 +1138,16 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
                         For i = selectionHyperlinks.Count To 1 Step -1
                             'this method produces errors if the hyperlinks include the square brackets in IEEE
                             If Left(selectionHyperlinks(1).Range.Text, 1) = "[" Then
-                                MsgBox "There was an error removing the hyperlinks because they include the square brackets." & vbCrLf & _
+                                MsgBox "There was an error removing the hyperlinks" & vbCrLf & _
+                                "because they include the square brackets and" & vbCrLf & _
                                 "Microsoft Word does not like them this way." & vbCrLf & vbCrLf & _
-                                "Please, use the macro GAUG_removeHyperlinksForCitations() with argument " & vbCrLf & _
-                                Chr(34) & "CleanEnvironment" & Chr(34) & " or " & _
-                                Chr(34) & "CleanFullEnvironment" & Chr(34) & "." & vbCrLf & _
-                                "You can also call the respective wrapper function.", vbOKOnly, "Cannot remove hyperlinks"
+                                "You cannot call the macro GAUG_removeHyperlinksForCitations()" & vbCrLf & _
+                                "with argument " & Chr(34) & "RemoveHyperlinks" & Chr(34) & "." & vbCrLf & _
+                                "Use " & Chr(34) & "CleanEnvironment" & Chr(34) & " or " & _
+                                Chr(34) & "CleanFullEnvironment" & Chr(34) & " instead." & vbCrLf & _
+                                "You can also call the respective wrapper function." & vbCrLf & vbCrLf & _
+                                "Cannot continue removing hyperlinks.", _
+                                vbCritical, "GAUG_removeHyperlinksForCitations()"
 
                                 'reenables the screen updating
                                 Application.ScreenUpdating = True
@@ -741,34 +1174,77 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
 
             End If
         Next
+    Next
 
 
 
-        'checks if the section has text with style "Titre de dernière section"
-        '(it is a section not belonging to any chapter after the sections of parts and chapters)
-        blnFound = False
-        With documentSection.Range.Find
-            .Style = "Titre de dernière section"
-            .Execute
-            blnFound = .Found
-        End With
+
+
+
+'*****************************
+'*  Cleaning old bookmarks   *
+'*****************************
+    'initializes the flag
+    blnBibliographyFound = False
+    'checks all sections
+    For Each documentSection In ActiveDocument.Sections
+        'if this is MabEntwickeltSich's document structure
+        If blnMabEntwickeltSich Then
+            'checks if the section has text with style indicated by strStyleForTitleOfBibliography
+            '(it is a section not belonging to any chapter after the sections of parts and chapters)
+            blnFound = False
+            With documentSection.Range.Find
+                .Style = strStyleForTitleOfBibliography
+                .Execute
+                blnFound = .Found
+            End With
+        'this is a document by another user
+        Else
+            'forces the macro to search for the bibliography in every section
+            blnFound = True
+        End If
 
         'checks if the bibliography is in this section
         If blnFound Then
             For Each sectionField In documentSection.Range.Fields
                 'if it is the bibliography
                 If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
+                    blnBibliographyFound = True
                     sectionField.Select
                     'deletes all bookmarks
                     For Each fieldBookmark In Selection.Bookmarks
                         'deletes current bookmark
                         fieldBookmark.Delete
                     Next
+
+                    sectionField.Select
+                    'gets all URL hyperlinks from selection
+                    Set selectionHyperlinks = Selection.Hyperlinks
+                    'deletes all URL hyperlinks
+                    'MsgBox "Total number of hyperlinks in biblio: " & CStr(selectionHyperlinks.Count)
+                    For i = selectionHyperlinks.Count To 1 Step -1
+                        'deletes the current URL hyperlink
+                        selectionHyperlinks(1).Delete
+                    Next
                 End If
             Next
         End If
 
     Next
+
+
+    'if the bibliography could not be located in the document
+    If Not blnBibliographyFound Then
+        MsgBox "The bibliography could not be located in the document." & vbCrLf & vbCrLf & _
+        "Make sure that you have inserted the bibliography via the Mendeley's plugin" & vbCrLf & _
+        "and that the custom configuration of the GWDG_* macros is correct." & vbCrLf & vbCrLf & _
+        "Cannot continue removing hyperlinks.", _
+        vbCritical, "GAUG_removeHyperlinksForCitations()"
+
+        'stops the execution
+        End
+    End If
+
 
     'selects the type of execution
     Select Case strTypeOfExecution
@@ -814,7 +1290,7 @@ End Sub
 '**  Sub GAUG_cleanEnvironment()                                                        **
 '**                                                                                     **
 '**  Calls Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String)          **
-'**     with parameter strTypeOfExecution = "CleanFullEnvironment"                      **
+'**     with parameter strTypeOfExecution = "CleanEnvironment"                          **
 '*****************************************************************************************
 '*****************************************************************************************
 Sub GAUG_cleanEnvironment()
@@ -839,36 +1315,6 @@ Sub GAUG_cleanFullEnvironment()
     'removes all bookmarks, hyperlinks and manual modifications to the citations and bibliography
     Call GAUG_removeHyperlinksForCitations("CleanFullEnvironment")
 End Sub
-
-
-
-'*****************************************************************************************
-'*****************************************************************************************
-'**  Author: Mendeley                                                                   **
-'**  Last modified: 2017-01-11                                                          **
-'**                                                                                     **
-'**  Function GAUG_getUndoEditButton() As CommandBarButton                              **
-'**                                                                                     **
-'**  This functions is not used anymore in any fo the GAUG_* functions                  **
-'**                                                                                     **
-'**  Gets the CommandBarButton "Undo Edit" installed by Mendeley's plugin.              **
-'**  The CommandBarButton is used to restore the original citation fields               **
-'**     inserted by Mendeley.                                                           **
-'*****************************************************************************************
-'*****************************************************************************************
-Function GAUG_getUndoEditButton() As CommandBarButton 'copied from Mendeley's plugin function "getUndoEditButton"
-
-    Dim mendeleyControl As CommandBarControl
-
-    For Each mendeleyControl In CommandBars("Mendeley Toolbar").Controls
-        If mendeleyControl.Caption = "Undo Edit" Then
-            Set GAUG_getUndoEditButton = mendeleyControl
-            Exit Function
-        End If
-    Next
-    ' if here, button hasn't been created yet
-    MsgBox "Undo edit button not found"
-End Function
 
 
 
