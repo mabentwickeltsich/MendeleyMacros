@@ -337,7 +337,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     'updated to separate authors from editors:
     'objRegExpCitationData.Pattern = "(\" & Chr(34) & "editor\" & Chr(34) & "\s:\s)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s\:\s\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & ")"
     'updated to also include the publication year:
-    objRegExpCitationData.Pattern = "((\" & Chr(34) & "editor\" & Chr(34) & "\s:\s)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s\:\s\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & "))|(\[\s\[\s\" & Chr(34) & "[0-9]+\" & Chr(34) & "\s\]\s\])"
+    objRegExpCitationData.Pattern = "((\" & Chr(34) & "editor\" & Chr(34) & "\s*:\s*)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s*\:\s*\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & "))|(\[\s*\[\s*\" & Chr(34) & "[0-9]+\" & Chr(34) & "\s*\]\s*\])"
     'sets case insensitivity
     objRegExpCitation.IgnoreCase = False
     objRegExpCitationData.IgnoreCase = False
