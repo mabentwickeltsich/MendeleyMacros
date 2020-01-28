@@ -305,7 +305,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     If Not blnBibliographyFound Then
         MsgBox "The bibliography could not be located in the document." & vbCrLf & vbCrLf & _
         "Make sure that you have inserted the bibliography via the Mendeley's plugin" & vbCrLf & _
-        "and that the custom configuration of the GWDG_* macros is correct." & vbCrLf & vbCrLf & _
+        "and that the custom configuration of the GAUG_* macros is correct." & vbCrLf & vbCrLf & _
         "Cannot continue creating hyperlinks.", _
         vbCritical, "GAUG_createHyperlinksForCitationsAPA()"
 
@@ -889,7 +889,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     If Not blnBibliographyFound Then
         MsgBox "The bibliography could not be located in the document." & vbCrLf & vbCrLf & _
         "Make sure that you have inserted the bibliography via the Mendeley's plugin" & vbCrLf & _
-        "and that the custom configuration of the GWDG_* macros is correct." & vbCrLf & vbCrLf & _
+        "and that the custom configuration of the GAUG_* macros is correct." & vbCrLf & vbCrLf & _
         "Cannot continue creating hyperlinks.", _
         vbCritical, "GAUG_createHyperlinksForCitationsIEEE()"
 
@@ -1237,7 +1237,7 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
     If Not blnBibliographyFound Then
         MsgBox "The bibliography could not be located in the document." & vbCrLf & vbCrLf & _
         "Make sure that you have inserted the bibliography via the Mendeley's plugin" & vbCrLf & _
-        "and that the custom configuration of the GWDG_* macros is correct." & vbCrLf & vbCrLf & _
+        "and that the custom configuration of the GAUG_* macros is correct." & vbCrLf & vbCrLf & _
         "Cannot continue removing hyperlinks.", _
         vbCritical, "GAUG_removeHyperlinksForCitations()"
 
