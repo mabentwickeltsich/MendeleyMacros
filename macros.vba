@@ -1,7 +1,7 @@
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2019-03-04                                                          **
+'**  Last modified: 2020-07-25                                                          **
 '**                                                                                     **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                         **
 '**                                                                                     **
@@ -22,7 +22,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim objRegExpBiblio, objRegExpCitation, objRegExpCitationData, objRegExpBiblioEntry, objRegExpFindEntry, objRegExpURL As RegExp
     Dim colMatchesBiblio, colMatchesCitation, colMatchesCitationData, colMatchesBiblioEntry, colMatchesFindEntry, colMatchesURL As MatchCollection
     Dim objMatchBiblio, objMatchCitation, objMatchCitationData, objMatchFindEntry, objMatchURL As Match
-    Dim strTempMatch, strLastAuthors, strLastYear As String
+    Dim strTempMatch, strSubStringOfTempMatch, strLastAuthors, strLastYear As String
     Dim strTypeOfExecution As String
     Dim blnMabEntwickeltSich As Boolean
     Dim stlStyleInDocument As Word.Style
@@ -179,6 +179,11 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             'removes the carriage return from match, if necessary
                             strTempMatch = Replace(objMatchBiblio.Value, Chr(13), "")
 
+                            'prevents errors if the match is longer than 256 characters
+                            'however, the reference will not be linked if it has more than 20 authors (APA 7th edition)
+                            'or more than 7 authors (APA 6th edition) due to the fact that APA replaces some of them with ellipsis (...)
+                            strSubStringOfTempMatch = Left(strTempMatch, 256)
+
                             'selects the current field (Mendeley's bibliography field)
                             sectionField.Select
 
@@ -187,10 +192,21 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             With Selection.Find
                                 .Forward = True
                                 .Wrap = wdFindStop
-                                .Text = strTempMatch
+                                .Text = strSubStringOfTempMatch
                                 .Execute
                                 blnReferenceEntryFound = .Found
                             End With
+
+                            'moves the selection, if necessary, to include the full match
+                            Selection.MoveEnd Unit:=wdCharacter, Count:=Len(strTempMatch) - Len(strSubStringOfTempMatch)
+
+                            'checks that the full match is found
+                            If Selection.Text = strTempMatch Then
+                                blnReferenceEntryFound = True
+                            Else
+                                'there is no more searching, the reference will not be linked in this case
+                                blnReferenceEntryFound = False
+                            End If
 
                             'if a match was found (it shall always find it, but good practice)
                             'creates the bookmark with the selected text
