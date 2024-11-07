@@ -164,7 +164,7 @@ Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer
             objRegExpWordOpenXMLCitations.Global = True
 
             'checks that the string can be compared
-            If (objRegExpWordOpenXMLCitations.Test(ActiveDocument.WordOpenXML) = True) Then
+            If objRegExpWordOpenXMLCitations.Test(ActiveDocument.WordOpenXML) Then
                 'gets the matches (all information of citations according to the regular expression)
                 Set colMatchesWordOpenXMLCitations = objRegExpWordOpenXMLCitations.Execute(ActiveDocument.WordOpenXML)
 
@@ -221,7 +221,7 @@ End Function
 '**  Parameter ccCitation is the citation's content control                                                                                   **
 '**     (when Mendeley Reference Manager 2.x is used)                                                                                         **
 '**                                                                                                                                           **
-'**  RETURNS: A string that contains all the information of the citation.                                                                     **
+'**  RETURNS: A string that contains the full information of the citation.                                                                    **
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 Function GAUG_getCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal strAllCitationsFullInformation As String, ByVal fldCitation As Field, ByVal ccCitation As ContentControl) As String
@@ -275,7 +275,7 @@ Function GAUG_getCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal str
                 objRegExpVisibleCitationItems.Global = True
 
                 'checks that the string can be compared
-                If (objRegExpVisibleCitationItems.Test(strAllCitationsFullInformation) = True) Then
+                If objRegExpVisibleCitationItems.Test(strAllCitationsFullInformation) Then
                     'gets the matches (all information of individual citations according to the regular expression)
                     Set colMatchesVisibleCitationItems = objRegExpVisibleCitationItems.Execute(strAllCitationsFullInformation)
 
@@ -317,7 +317,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-02                                                                                                                **
+'**  Last modified: 2024-10-04                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As Integer,                                                  **
 '**     ByVal strCitationFullInfo As String) As Variant()                                                                                     **
@@ -385,7 +385,7 @@ Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As I
 
 
         'checks that the string can be compared
-        If (objRegExpCitationItems.Test(strCitationFullInfo) = True) Then
+        If objRegExpCitationItems.Test(strCitationFullInfo) Then
             'gets the matches (individual citation items according to the regular expression)
             Set colMatchesCitationItems = objRegExpCitationItems.Execute(strCitationFullInfo)
 
@@ -413,7 +413,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-02                                                                                                                **
+'**  Last modified: 2024-10-08                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal strAuthorEditor As String,                    **
 '**     ByVal strCitationItem As String) As Variant()                                                                                         **
@@ -451,7 +451,18 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
         MsgBox "The version " & intMendeleyVersion & " of Mendeley's plugin is not valid." & vbCrLf & vbCrLf & _
             "Use version 1 or version 2 instead," & vbCrLf & vbCrLf & _
             "Cannot continue creating hyperlinks.", _
-            vbCritical, "GAUG_getAuthorsEditorsFromCitationItem(intMendeleyVersion, strCitationItem)"
+            vbCritical, "GAUG_getAuthorsEditorsFromCitationItem(intMendeleyVersion, strAutorEditor, strCitationItem)"
+
+        'stops the execution
+        End
+    End If
+
+    'if the argument is not 'author' or 'editor'
+    If Not (strAutorEditor = "author" Or strAutorEditor = "editor") Then
+        MsgBox "The argument for strAutorEditor is not valid." & vbCrLf & vbCrLf & _
+            "Use " & Chr(34) & "author" & Chr(34) & " or " & Chr(34) & "editor" & Chr(34) & " instead," & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_getAuthorsEditorsFromCitationItem(intMendeleyVersion, strAutorEditor, strCitationItem)"
 
         'stops the execution
         End
@@ -484,7 +495,7 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
 
 
         'checks that the string can be compared
-        If (objRegExpAuthorsFromCitationItem.Test(strCitationItem) = True) Then
+        If objRegExpAuthorsFromCitationItem.Test(strCitationItem) Then
             'gets the matches (list of all authors as a single block of data)
             Set colMatchesAuthorsFromCitationItem = objRegExpAuthorsFromCitationItem.Execute(strCitationItem)
 
@@ -517,7 +528,7 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
 
 
                 'checks that the string can be compared
-                If (objRegExpAuthorFamilyNamesFromCitationItem.Test(objMatchAuthorFromCitationItem.value) = True) Then
+                If objRegExpAuthorFamilyNamesFromCitationItem.Test(objMatchAuthorFromCitationItem.value) Then
                     'gets the matches (the family names of all authors)
                     Set colMatchesAuthorFamilyNamesFromCitationItem = objRegExpAuthorFamilyNamesFromCitationItem.Execute(objMatchAuthorFromCitationItem.value)
 
@@ -552,7 +563,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-02                                                                                                                **
+'**  Last modified: 2024-10-04                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getYearFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal strCitationItem As String) As String                    **
 '**                                                                                                                                           **
@@ -615,7 +626,7 @@ Function GAUG_getYearFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal
 
 
         'checks that the string can be compared
-        If (objRegExpYearFromCitationItem.Test(strCitationItem) = True) Then
+        If objRegExpYearFromCitationItem.Test(strCitationItem) Then
             'gets the matches (the year of issue)
             Set colMatchesYearFromCitationItem = objRegExpYearFromCitationItem.Execute(strCitationItem)
 
@@ -645,7 +656,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-02                                                                                                                **
+'**  Last modified: 2024-10-05                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getPartsFromVisibleCitationItem(ByVal strVisibleCitationItem As String) As Variant()                                       **
 '**                                                                                                                                           **
@@ -713,21 +724,19 @@ End Function
 
 
 
-'*****************************************************************************************
-'*****************************************************************************************
-'**  Author: José Luis González García                                                  **
-'**  Last modified: 2024-10-07                                                          **
-'**                                                                                     **
-'**  Sub GAUG_createHyperlinksForCitationsAPA()                                         **
-'**                                                                                     **
-'**  Generates the bookmarks in the bibliography inserted by Mendeley's plugin.         **
-'**  Links the citations inserted by Mendeley's plugin to the corresponding entry       **
-'**     in the bibliography inserted by Mendeley's plugin.                              **
-'**  Generates the hyperlinks for the URLs in the bibliography inserted by              **
-'**     Mendeley's plugin.                                                              **
-'**  Only for APA CSL citation style.                                                   **
-'*****************************************************************************************
-'*****************************************************************************************
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-07                                                                                                                **
+'**                                                                                                                                           **
+'**  Sub GAUG_createHyperlinksForCitationsAPA()                                                                                               **
+'**                                                                                                                                           **
+'**  Generates the bookmarks in the bibliography inserted by Mendeley's plugin.                                                               **
+'**  Links the citations inserted by Mendeley's plugin to the corresponding entry in the bibliography inserted by Mendeley's plugin.          **
+'**  Generates the hyperlinks for the URLs in the bibliography inserted by Mendeley's plugin.                                                 **
+'**  Only for APA CSL citation style.                                                                                                         **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
 Sub GAUG_createHyperlinksForCitationsAPA()
 
     Dim intAvailableMendeleyVersion, intUseMendeleyVersion As Integer
@@ -746,7 +755,6 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim strURL As String
     Dim arrNonDetectedURLs, varNonDetectedURL As Variant
     Dim strDoHyperlinksExist As String
-    Dim intTotalNumberOfFieldsOrContentControls, intIndexCurrentFieldOrContentControl As Integer
     Dim objCurrentFieldOrContentControl As Object
     Dim strAllCitationsFullInformation, strCitationFullInfo As String
     Dim varCitationItemsFromCitationFullInfo() As Variant
@@ -932,7 +940,6 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             End If
                 End Select
 
-
                 'if it is the bibliography
                 If blnBibliographyFound Then
                     'start the numbering
@@ -951,7 +958,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                     End Select
 
                     'checks that the string can be compared
-                    If (objRegExpBiblioEntries.Test(Selection) = True) Then
+                    If objRegExpBiblioEntries.Test(Selection) Then
                         'gets the matches (all entries in bibliography according to the regular expression)
                         Set colMatchesBiblioEntries = objRegExpBiblioEntries.Execute(Selection)
 
@@ -1072,7 +1079,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         End Select
 
                         'checks that the string can be compared (both, Selection and Field.Code)
-                        If objRegExpURL.Test(Selection) = True Then
+                        If objRegExpURL.Test(Selection) Then
                             'gets the matches (all URLs in the biblio according to the regular expression)
                             Set colMatchesURL = objRegExpURL.Execute(Selection)
 
@@ -1145,7 +1152,6 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
     Next 'documentSection
 
-
     'if the bibliography could not be located in the document
     If Not blnBibliographyFound Then
         MsgBox "The bibliography could not be located in the document." & vbCrLf & vbCrLf & _
@@ -1185,7 +1191,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
     strOrphanCitationItems = ""
 
-    
+
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
         
@@ -1246,9 +1252,8 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             varCitationItemsFromCitationFullInfo = GAUG_getCitationItemsFromCitationFullInfo(intAvailableMendeleyVersion, strCitationFullInfo)
                 End Select
 
-
                 'checks that the string can be compared
-                If (objRegExpVisibleCitationItems.Test(Selection) = True) Then
+                If objRegExpVisibleCitationItems.Test(Selection) Then
                     'gets the matches (all entries in the citation according to the regular expression)
                     Set colMatchesVisibleCitationItems = objRegExpVisibleCitationItems.Execute(Selection)
 
@@ -1260,11 +1265,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         'position 3 is the letter after the issue year (when present)
                         varPartsFromVisibleCitationItem = GAUG_getPartsFromVisibleCitationItem(objMatchVisibleCitationItem.value)
 
-
                         'when citations are merged, they are ordered by the authors' family names
                         'the position of the citation in the visible text may not correspond to the position in the citation hidden data,
                         'we need to find the entry, but we may not have the authors's family names :(
-
 
                         'if the current match has authors' family names (not only the year) (it could happen that they are the editors' family names, but we do not know yet)
                         'we keep them stored for future use if next citation item DOES NOT include them
@@ -1283,11 +1286,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 'gets the year of issue from the citation item
                                 varYearFomCitationItem = GAUG_getYearFromCitationItem(intAvailableMendeleyVersion, varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
 
-
                                 'initializes the regular expressions
                                 objRegExpFindBiblioEntry.Pattern = ""
                                 objRegExpFindVisibleCitationItem.Pattern = ""
-
 
                                 'if the citation item has authors (instead of editors)
                                 If Not Not varAuthorsFomCitationItem Then
@@ -1339,7 +1340,6 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & vbCrLf & _
                                 '    objRegExpFindBiblioEntry.Pattern
 
-
                                 'if the current visible citation item has authors's family names (not only the year)
                                 If Len(varPartsFromVisibleCitationItem(1)) > 0 Then
                                     'checks if this item from the citation full information corresponds to the visible citation item being treated
@@ -1359,8 +1359,6 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             Next 'treats all citation items from the citation full information
                         End If 'checks if the list of all items from the citation full information is not empty
 
-
-
                         'last verification to make sure we are here because this item from the citation full information corresponds
                         'to the visible citation item being treated and not because the for loop reached the end
                         If colMatchesFindVisibleCitationItem.Count = 0 Then
@@ -1375,9 +1373,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & _
                         '    objRegExpFindBiblioEntry.Pattern
 
-
                         'it is time to find the citation entry in the bibliography and link the current visible citation item
-
 
                         'initializes the position
                         intRefereceNumber = 1
@@ -1445,7 +1441,6 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 Selection.Hyperlinks.Add Anchor:=Selection.range, _
                                     Address:="", SubAddress:="GAUG_SignetBibliographie_" & format(CStr(intRefereceNumber), "00#"), _
                                     ScreenTip:=""
-
                             End If
                         Else
                             'if the visible citation item could not be linked to an entry in the bibliography
@@ -1460,10 +1455,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
             End If 'if it is a citation
         Next 'checks all fields or content controls
-
-        'at this point all citations are linked to their corresponding reference in biblio
-
     Next 'documentSection
+
+    'at this point all citations are linked to their corresponding reference in biblio
 
     'if orphan citations exist
     If Len(strOrphanCitationItems) > 0 Then
@@ -1475,7 +1469,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
     'returns to original position in the document
     currentPosition.Select
-    
+
     'reenables the screen updating
     Application.ScreenUpdating = True
 
@@ -1483,23 +1477,22 @@ End Sub
 
 
 
-'*****************************************************************************************
-'*****************************************************************************************
-'**  Author: José Luis González García                                                  **
-'**  Last modified: 2024-10-05                                                          **
-'**                                                                                     **
-'**  Sub GAUG_createHyperlinksForCitationsIEEE()                                        **
-'**                                                                                     **
-'**  Generates the bookmarks in the bibliography inserted by Mendeley's plugin.         **
-'**  Links the citations inserted by Mendeley's plugin to the corresponding entry       **
-'**     in the bibliography inserted by Mendeley's plugin.                              **
-'**  Generates the hyperlinks for the URLs in the bibliography inserted by              **
-'**     Mendeley's plugin.                                                              **
-'**  Only for IEEE CSL citation style.                                                  **
-'*****************************************************************************************
-'*****************************************************************************************
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-08                                                                                                                **
+'**                                                                                                                                           **
+'**  Sub GAUG_createHyperlinksForCitationsIEEE()                                                                                              **
+'**                                                                                                                                           **
+'**  Generates the bookmarks in the bibliography inserted by Mendeley's plugin.                                                               **
+'**  Links the citations inserted by Mendeley's plugin to the corresponding entry in the bibliography inserted by Mendeley's plugin.          **
+'**  Generates the hyperlinks for the URLs in the bibliography inserted by Mendeley's plugin.                                                 **
+'**  Only for IEEE CSL citation style.                                                                                                        **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
 Sub GAUG_createHyperlinksForCitationsIEEE()
 
+    Dim intAvailableMendeleyVersion, intUseMendeleyVersion As Integer
     Dim documentSection As Section
     Dim sectionField As Field
     Dim blnFound, blnBibliographyFound, blnReferenceNumberFound, blnCitationNumberFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
@@ -1516,10 +1509,24 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     Dim strURL As String
     Dim arrNonDetectedURLs, varNonDetectedURL As Variant
 
+    Dim strDoHyperlinksExist As String
+    Dim objCurrentFieldOrContentControl As Object
+    Dim strOrphanCitationItems As String
+    Dim varFieldsOrContentControls As Variant
+    Dim currentPosition As range
+    Dim blnIsSingleCitation As Boolean
+
 
 '*****************************
 '*   Custom configuration    *
 '*****************************
+    'possible values are 0, 1 or 2
+    'SEE DOCUMENTATION
+    'set to 0 if the macros should automatically detect the version of Mendeley
+    'set to 1 if the macros should use Mendeley Desktop 1.x (with the MS Word plugin Mendeley Cite-O-Matic)
+    'set to 2 if the macros should use Mendeley Reference Manager 2.x (with the App Mendeley Cite)
+    intUseMendeleyVersion = 0
+
     'SEE DOCUMENTATION
     'specifies the name of the font style used for the title of the bibliography
     strStyleForTitleOfBibliography = "Titre de dernière section"
@@ -1551,6 +1558,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
     'possible values are "RemoveHyperlinks", "CleanEnvironment" and "CleanFullEnvironment"
     'SEE DOCUMENTATION
+    'When Mendeley Reference Manager 2.x is used, ONLY "RemoveHyperlinks" is available
     strTypeOfExecution = "RemoveHyperlinks"
 
 
@@ -1582,9 +1590,11 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
         End
     End If
 
+    'gets the version of Mendeley (autodetect or specified)
+    intAvailableMendeleyVersion = GAUG_getAvailableMendeleyVersion(intUseMendeleyVersion)
 
-    'checks for conflicts (square brackets and removal of hyperlinks)
-    If blnIncludeSquareBracketsInHyperlinks And strTypeOfExecution = "RemoveHyperlinks" Then
+    'checks for conflicts (square brackets and removal of hyperlinks with Mendeley Desktop 1.x)
+    If intAvailableMendeleyVersion = 1 And blnIncludeSquareBracketsInHyperlinks And strTypeOfExecution = "RemoveHyperlinks" Then
         MsgBox "The hyperlinks will include the square brackets and" & vbCrLf & _
             "Microsoft Word does not like them this way." & vbCrLf & vbCrLf & _
             "You cannot call the macro GAUG_removeHyperlinksForCitations(strTypeOfExecution)" & vbCrLf & _
@@ -1598,6 +1608,9 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
         End
     End If
 
+    'gets the current position of the cursor on the document
+    Set currentPosition = Selection.range
+
 
 
 
@@ -1606,8 +1619,22 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*****************************
 '*  Cleaning old hyperlinks  *
 '*****************************
-    'removes all hyperlinks
-    Call GAUG_removeHyperlinksForCitations(strTypeOfExecution)
+    'checks for conflicts (square brackets and removal of hyperlinks with Mendeley Reference Manager 2.x)
+    If intAvailableMendeleyVersion = 2 And blnIncludeSquareBracketsInHyperlinks Then
+        'the macro cannot remove the hyperlinks with square brackets, Microsoft Word does not like them this way
+        MsgBox "The hyperlinks will include the square brackets and" & vbCrLf & _
+            "Microsoft Word does not like them this way." & vbCrLf & vbCrLf & _
+            "The macros cannot remove the hyperlinks" & vbCrLf & _
+            "when Mendeley Reference Manager 2.x is used." & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_createHyperlinksForCitationsIEEE()"
+
+            'stops the execution
+            End
+    Else
+        'removes all hyperlinks
+        Call GAUG_removeHyperlinksForCitations(strTypeOfExecution)
+    End If
 
 
 
@@ -1622,7 +1649,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*****************************
     'creates the object for regular expressions (to get all URLs in biblio)
     Set objRegExpURL = New RegExp
-    'sets the pattern to match every URL in bibliography
+    'sets the pattern to match every URL in the bibliography (http, https or ftp)
     objRegExpURL.Pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
     'sets case insensitivity
     objRegExpURL.IgnoreCase = False
@@ -1651,16 +1678,53 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
         'checks if the bibliography is in this section
         If blnFound Then
-            'checks all fields
-            For Each sectionField In documentSection.range.Fields
+            'according to the version of Mendeley
+            Select Case intAvailableMendeleyVersion
+                'Mendeley Desktop 1.x is installed
+                Case 1
+                        'gets the list of fields in this section
+                        Set varFieldsOrContentControls = documentSection.range.Fields
+                'Mendeley Reference Manager 2.x is installed
+                Case 2
+                        'gets the list of content controls in this section
+                        Set varFieldsOrContentControls = documentSection.range.ContentControls
+            End Select
+
+            'checks all fields or content controls
+            For Each objCurrentFieldOrContentControl In varFieldsOrContentControls
+
+                'according to the version of Mendeley
+                Select Case intAvailableMendeleyVersion
+                    'Mendeley Desktop 1.x is installed
+                    Case 1
+                            'checks if it is the bibliography
+                            If objCurrentFieldOrContentControl.Type = wdFieldAddin And Trim(objCurrentFieldOrContentControl.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
+                                blnBibliographyFound = True
+                            End If
+                    'Mendeley Reference Manager 2.x is installed
+                    Case 2
+                            'checks if it is the bibliograpy
+                            If objCurrentFieldOrContentControl.Type = wdContentControlRichText And Trim(objCurrentFieldOrContentControl.Tag) = "MENDELEY_BIBLIOGRAPHY" Then
+                                blnBibliographyFound = True
+                            End If
+                End Select
+
                 'if it is the bibliography
-                If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
-                    blnBibliographyFound = True
+                If blnBibliographyFound Then
                     'start the numbering
                     intRefereceNumber = 1
                     Do
-                        'selects the current field (Mendeley's bibliography field)
-                        sectionField.Select
+                        'according to the version of Mendeley
+                        Select Case intAvailableMendeleyVersion
+                            'Mendeley Desktop 1.x is installed
+                            Case 1
+                                    'selects the current field (Mendeley's bibliography field)
+                                    objCurrentFieldOrContentControl.Select
+                            'Mendeley Reference Manager 2.x is installed
+                            Case 2
+                                    'selects the current content control (Mendeley's bibliography content control)
+                                    objCurrentFieldOrContentControl.range.Select
+                        End Select
 
                         'finds and selects the text of the number of the reference
                         With Selection.Find
@@ -1697,44 +1761,62 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                     'while numbers of refereces are found
                     Loop While (blnReferenceNumberFound)
 
-                    'generates the hyperlinks for the URLs in the bibliography if required
+                    'generates the hyperlinks for the URLs in the bibliography, if required
                     If blnGenerateHyperlinksForURLs Then
 
                         'generates the hyperlnks from the list of non detected URLs
                         'the non detected URLs shall be done first or some conflicts may arise
                         For Each varNonDetectedURL In arrNonDetectedURLs
-                                'selects the current field (Mendeley's bibliography field)
-                                sectionField.Select
+                            'according to the version of Mendeley
+                            Select Case intAvailableMendeleyVersion
+                                'Mendeley Desktop 1.x is installed
+                                Case 1
+                                        'selects the current field (Mendeley's bibliography field)
+                                        objCurrentFieldOrContentControl.Select
+                                'Mendeley Reference Manager 2.x is installed
+                                Case 2
+                                        'selects the current content control (Mendeley's bibliography content control)
+                                        objCurrentFieldOrContentControl.range.Select
+                            End Select
 
-                                'finds all instances of current URL
-                                Do
-                                    'finds and selects the text of the URL
-                                    With Selection.Find
-                                        .Forward = True
-                                        .Wrap = wdFindStop
-                                        .Text = CStr(varNonDetectedURL)
-                                        .Execute
-                                        blnURLFound = .found
-                                    End With
+                            'finds all instances of current URL
+                            Do
+                                'finds and selects the text of the URL
+                                With Selection.Find
+                                    .Forward = True
+                                    .Wrap = wdFindStop
+                                    .Text = CStr(varNonDetectedURL)
+                                    .Execute
+                                    blnURLFound = .found
+                                End With
 
-                                    'creates the hyperlink
-                                    If blnURLFound Then
-                                        'checks there is no hyperlink already
-                                        If Selection.Hyperlinks.Count = 0 Then
-                                            Selection.Hyperlinks.Add Anchor:=Selection.range, _
-                                                Address:=Replace(Trim(CStr(varNonDetectedURL)), " ", "%20"), SubAddress:="", _
-                                                ScreenTip:=""
-                                        End If
+                                'creates the hyperlink
+                                If blnURLFound Then
+                                    'checks there is no hyperlink already
+                                    If Selection.Hyperlinks.Count = 0 Then
+                                        Selection.Hyperlinks.Add Anchor:=Selection.range, _
+                                            Address:=Replace(Trim(CStr(varNonDetectedURL)), " ", "%20"), SubAddress:="", _
+                                            ScreenTip:=""
                                     End If
+                                End If
 
-                                Loop Until (Not blnURLFound) 'finds all instances of current URL
+                            Loop Until (Not blnURLFound) 'finds all instances of current URL
                         Next 'generates the hyperlnks from the list of non detected URLs
 
-                        'selects the current field (Mendeley's bibliography field)
-                        sectionField.Select
+                        'according to the version of Mendeley
+                        Select Case intAvailableMendeleyVersion
+                            'Mendeley Desktop 1.x is installed
+                            Case 1
+                                    'selects the current field (Mendeley's bibliography field)
+                                    objCurrentFieldOrContentControl.Select
+                            'Mendeley Reference Manager 2.x is installed
+                            Case 2
+                                    'selects the current content control (Mendeley's bibliography content control)
+                                    objCurrentFieldOrContentControl.range.Select
+                        End Select
 
                         'checks that the string can be compared (both, Selection and Field.Code)
-                        If objRegExpURL.Test(Selection) = True Then
+                        If objRegExpURL.Test(Selection) Then
                             'gets the matches (all URLs in the biblio according to the regular expression)
                             Set colMatchesURL = objRegExpURL.Execute(Selection)
 
@@ -1748,8 +1830,17 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                                     strURL = objMatchURL.value
                                 End If
 
-                                'selects the current field (Mendeley's bibliography field)
-                                sectionField.Select
+                                'according to the version of Mendeley
+                                Select Case intAvailableMendeleyVersion
+                                    'Mendeley Desktop 1.x is installed
+                                    Case 1
+                                            'selects the current field (Mendeley's bibliography field)
+                                            objCurrentFieldOrContentControl.Select
+                                    'Mendeley Reference Manager 2.x is installed
+                                    Case 2
+                                            'selects the current content control (Mendeley's bibliography content control)
+                                            objCurrentFieldOrContentControl.range.Select
+                                End Select
 
                                 'finds all instances of current URL
                                 Do
@@ -1783,11 +1874,27 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
                     End If 'hyperlinks for URLs in bibliography
 
-                End If 'if it is the biblio
-            Next 'sectionField
-        End If
-    Next 'documentSection
+                    'exits the for loop, the bibliography has ben found already
+                    Exit For
 
+                End If 'if it is the biblio
+
+                'if the bibliography has been found already, no need to check other fields or content controls
+                If blnBibliographyFound Then
+                    'exits the for loop, the bibliography has ben found already
+                    Exit For
+                End If
+
+            Next 'checks all fields or content controls
+        End If 'checks if the bibliography is in this section
+
+        'if the bibliography has been found already, no need to check other sections
+        If blnBibliographyFound Then
+            'exits the for loop, the bibliography has ben found already
+            Exit For
+        End If
+
+    Next 'documentSection
 
     'if the bibliography could not be located in the document
     If Not blnBibliographyFound Then
@@ -1809,33 +1916,88 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*****************************
 '*   Linking the bookmarks   *
 '*****************************
-    'creates the object for regular expressions (to get all entries in current citation, all entries of data in current citation, position of citation entry in biblio)
+    'creates the object for regular expressions (to get all entries in current citation)
     Set objRegExpVisibleCitationItems = New RegExp
-    'sets the pattern to match every citation entry in current field
+    'sets the pattern to match every citation entry in the visible text of the current field or content control
     'it should be "[" + Number + "]"
     objRegExpVisibleCitationItems.Pattern = "\[[0-9]+\]"
     'sets case insensitivity
     objRegExpVisibleCitationItems.IgnoreCase = False
     'sets global applicability
     objRegExpVisibleCitationItems.Global = True
+    
+    strOrphanCitationItems = ""
+
 
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
-        'checks all fields
-        For Each sectionField In documentSection.range.Fields
+        
+        'according to the version of Mendeley
+        Select Case intAvailableMendeleyVersion
+            'Mendeley Desktop 1.x is installed
+            Case 1
+                    'gets the list of fields in this section
+                    Set varFieldsOrContentControls = documentSection.range.Fields
+            'Mendeley Reference Manager 2.x is installed
+            Case 2
+                    'gets the list of content controls in this section
+                    Set varFieldsOrContentControls = documentSection.range.ContentControls
+        End Select
+
+        'checks all fields or content controls
+        For Each objCurrentFieldOrContentControl In varFieldsOrContentControls
+            'initializes the flag
+            blnCitationFound = False
+
+            'according to the version of Mendeley
+            Select Case intAvailableMendeleyVersion
+                'Mendeley Desktop 1.x is installed
+                Case 1
+                        'checks if it is a citation
+                        If objCurrentFieldOrContentControl.Type = wdFieldAddin And Left(objCurrentFieldOrContentControl.Code, 18) = "ADDIN CSL_CITATION" Then
+                            blnCitationFound = True
+                        End If
+                'Mendeley Reference Manager 2.x is installed
+                Case 2
+                        'checks if it is a citation
+                        If objCurrentFieldOrContentControl.Type = wdContentControlRichText And Left(Trim(objCurrentFieldOrContentControl.Tag), 21) = "MENDELEY_CITATION_v3_" Then
+                            blnCitationFound = True
+                        End If
+            End Select
+
             'if it is a citation
-            If sectionField.Type = wdFieldAddin And Left(sectionField.Code, 18) = "ADDIN CSL_CITATION" Then
+            If blnCitationFound Then
 
-                'selects the current field (Mendeley's citation field)
-                sectionField.Select
+                'according to the version of Mendeley
+                Select Case intAvailableMendeleyVersion
+                    'Mendeley Desktop 1.x is installed
+                    Case 1
+                            'selects the current field (Mendeley's citation field)
+                            objCurrentFieldOrContentControl.Select
+                    'Mendeley Reference Manager 2.x is installed
+                    Case 2
+                            'selects the current content control (Mendeley's citation content control)
+                            objCurrentFieldOrContentControl.range.Select
+                End Select
 
-                'checks that the string can be compared (both, Selection and Field.Code)
-                If objRegExpVisibleCitationItems.Test(Selection) = True Then
+                'checks that the string can be compared
+                If objRegExpVisibleCitationItems.Test(Selection) Then
                     'gets the matches (all entries in the citation according to the regular expression)
                     Set colMatchesVisibleCitationItems = objRegExpVisibleCitationItems.Execute(Selection)
 
                     'treats all matches (all entries in citation) to generate hyperlinks
                     For Each objMatchVisibleCitationItem In colMatchesVisibleCitationItems
+                        'weird things happen when there is only one citation item
+                        '(the hyperlink is created in the bibliography instead of the citation)
+                        'this happens when the full text of the Selection matches the regular expression to find the number of the reference
+                        'needs to make sure this does not happen (it only happens with Mendeley Reference Manager 2.x)
+                        'somehow the Selection moves form the citation content control to the bibliography content control
+                        If colMatchesVisibleCitationItems.Count > 1 Then
+                            blnIsSingleCitation = False
+                        Else
+                            blnIsSingleCitation = True
+                        End If
+
                         'gets the citation number as integer
                         'this will also eliminate leading zeros in numbers (in case of manual modifications)
                         intCitationNumber = CInt(Mid(objMatchVisibleCitationItem.value, 2, Len(objMatchVisibleCitationItem.value) - 2))
@@ -1850,46 +2012,103 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
                         'if a number of a citation was found (shall always find it), inserts the hyperlink
                         If blnCitationNumberFound Then
-                            'selects the current field (Mendeley's citation field)
-                            sectionField.Select
+                            'according to the version of Mendeley
+                            Select Case intAvailableMendeleyVersion
+                                'Mendeley Desktop 1.x is installed
+                                Case 1
+                                        'selects the current field (Mendeley's citation field)
+                                        objCurrentFieldOrContentControl.Select
+                                'Mendeley Reference Manager 2.x is installed
+                                Case 2
+                                        'selects the current content control (Mendeley's citation content control)
+                                        objCurrentFieldOrContentControl.range.Select
+                            End Select
 
                             'finds and selects the text of the number of the reference
-                            With Selection.Find
-                                .Forward = True
-                                .Wrap = wdFindStop
-                                .Text = "[" & CStr(intCitationNumber) & "]"
-                                .Execute
-                                blnReferenceNumberFound = .found
-                            End With
-
-                            'if the square brackets are not part of the hyperlinks
-                            If Not blnIncludeSquareBracketsInHyperlinks Then
-                                'restricts the selection to only the number
-                                Selection.MoveStart Unit:=wdCharacter, Count:=1
-                                Selection.MoveEnd Unit:=wdCharacter, Count:=-1
+                            If blnIsSingleCitation Then
+                                With Selection.Find
+                                    .Forward = True
+                                    .Wrap = wdFindStop
+                                    .Text = CStr(intCitationNumber)
+                                    .Execute
+                                    blnReferenceNumberFound = .found
+                                End With
+                            Else
+                                With Selection.Find
+                                    .Forward = True
+                                    .Wrap = wdFindStop
+                                    .Text = "[" & CStr(intCitationNumber) & "]"
+                                    .Execute
+                                    blnReferenceNumberFound = .found
+                                End With
                             End If
 
-                            'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
-                            'Selection.Fields.Add Range:=Selection.Range, _
-                            '    Type:=wdFieldEmpty, _
-                            '    Text:="REF " & Chr(34) & "GAUG_SignetBibliographie_" & Format(CStr(intCitationNumber), "00#") & Chr(34) & " \h", _
-                            '    PreserveFormatting:=True
-                            'better to use normal hyperlink:
-                            Selection.Hyperlinks.Add Anchor:=Selection.range, _
-                                Address:="", SubAddress:="GAUG_SignetBibliographie_" & format(CStr(intCitationNumber), "00#"), _
-                                ScreenTip:=""
+                            'if a match was found (it should always find it, but good practice)
+                            'selects the correct entry text from the citation field
+                            If blnReferenceNumberFound Then
+                                'if it is a single citation item in the citation field or content control
+                                If blnIsSingleCitation Then
+                                    'if the square brackets are part of the hyperlinks
+                                    'selects the whole citation to include the square brackets
+                                    'weird things happen if we extend the selection manually with Selection.Move*
+                                    'however, the hyperlink may not be easily removed later
+                                    If blnIncludeSquareBracketsInHyperlinks Then
+                                        'according to the version of Mendeley
+                                        Select Case intAvailableMendeleyVersion
+                                            'Mendeley Desktop 1.x is installed
+                                            Case 1
+                                                    'selects the current field (Mendeley's citation field)
+                                                    objCurrentFieldOrContentControl.Select
+                                            'Mendeley Reference Manager 2.x is installed
+                                            Case 2
+                                                    'selects the current content control (Mendeley's citation content control)
+                                                    objCurrentFieldOrContentControl.range.Select
+                                        End Select
+                                    End If
+                                'if there are multiple citation items in the citation field or content control
+                                Else
+                                    'if the square brackets are not part of the hyperlinks
+                                    If Not blnIncludeSquareBracketsInHyperlinks Then
+                                        'restricts the selection to only the number
+                                        Selection.MoveStart Unit:=wdCharacter, Count:=1
+                                        Selection.MoveEnd Unit:=wdCharacter, Count:=-1
+                                    End If
+                                End If
+
+                                'creates the hyperlink for the current citation entry
+                                'a cross-reference is not a good idea, it changes the text in citation (or may delete citation):
+                                'better to use normal hyperlink:
+                                Selection.Hyperlinks.Add Anchor:=Selection.range, _
+                                    Address:="", SubAddress:="GAUG_SignetBibliographie_" & format(CStr(intCitationNumber), "00#"), _
+                                    ScreenTip:=""
+                            End If
                         Else
-                            MsgBox "Orphan citation entry found:" & vbCrLf & vbCrLf & _
-                                objMatchVisibleCitationItem.value & vbCrLf & vbCrLf & _
-                                "Remove it from document!", _
-                                vbExclamation, "GAUG_createHyperlinksForCitationsIEEE()"
+                            'if the visible citation item could not be linked to an entry in the bibliography
+                            strOrphanCitationItems = strOrphanCitationItems & Trim(objMatchVisibleCitationItem.value) & vbCrLf
                         End If
+
+                        'at this point current citation entry is linked to corresponding reference in biblio
+
                     Next 'treats all matches (all entries in citation) to generate hyperlinks
+
                 End If 'checks that the string can be compared
 
             End If 'if it is a citation
-        Next 'sectionField
+        Next 'checks all fields or content controls
     Next 'documentSection
+
+    'at this point all citations are linked to their corresponding reference in biblio
+
+    'if orphan citations exist
+    If Len(strOrphanCitationItems) > 0 Then
+        MsgBox "Orphan citation entries found:" & vbCrLf & vbCrLf & _
+        strOrphanCitationItems & vbCrLf & _
+        "Remove them from document!", _
+        vbExclamation, "GAUG_createHyperlinksForCitationsIEEE()"
+    End If
+
+    'returns to original position in the document
+    currentPosition.Select
 
     'reenables the screen updating
     Application.ScreenUpdating = True
@@ -1898,42 +2117,36 @@ End Sub
 
 
 
-'*****************************************************************************************
-'*****************************************************************************************
-'**  Author: José Luis González García                                                  **
-'**  Last modified: 2024-10-08                                                          **
-'**                                                                                     **
-'**  Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String)                **
-'**                                                                                     **
-'**  This is an improved version which runs much faster,                                **
-'**  but still considered as experimental.                                              **
-'**  Make sure you have a backup of your document before you execute it!                **
-'**                                                                                     **
-'**  Removes the bookmarks generated by GAUG_createHyperlinksForCitations*              **
-'**     in the bibliography inserted by Mendeley's plugin.                              **
-'**  Removes the hyperlinks generated by GAUG_createHyperlinksForCitations*             **
-'**     of the citations inserted by Mendeley's plugin.                                 **
-'**  Removes the hyperlinks generated by GAUG_createHyperlinksForCitations*             **
-'**     in the bibliography inserted by Mendeley's plugin.                              **
-'**  Removes all manual modifications to the citations and bibliography if specified    **
-'**                                                                                     **
-'**  Parameter strTypeOfExecution can have three different values:                      **
-'**  "RemoveHyperlinks":                                                                **
-'**     UNEXPECTED RESULTS IF MANUAL MODIFICATIONS EXIST, BUT THE FASTEST               **
-'**        Removes the bookmarks and hyperlinks                                         **
-'**        Manual modifications to citations and bibliography will remain intact        **
-'**  "CleanEnvironment":                                                                **
-'**     EXPERIMENTAL, BUT VERY FAST                                                     **
-'**        Removes the bookmarks and hyperlinks                                         **
-'**        Manual modifications to citations and bibliography will also be removed      **
-'**           to have a clean environment                                               **
-'**  "CleanFullEnvironment":                                                            **
-'**     SAFE, BUT VERY SLOW IN LONG DOCUMENTS                                           **
-'**        Removes the bookmarks and hyperlinks                                         **
-'**        Manual modifications to citations and bibliography will also be removed      **
-'**           to have a clean environment                                               **
-'*****************************************************************************************
-'*****************************************************************************************
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-08                                                                                                                **
+'**                                                                                                                                           **
+'**  Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As String = "RemoveHyperlinks")                                  **
+'**                                                                                                                                           **
+'**  This is an improved version which runs much faster, but still considered as experimental.                                                **
+'**  Make sure you have a backup of your document before you execute it!                                                                      **
+'**                                                                                                                                           **
+'**  Removes the bookmarks generated by GAUG_createHyperlinksForCitations* in the bibliography inserted by Mendeley's plugin.                 **
+'**  Removes the hyperlinks generated by GAUG_createHyperlinksForCitations* of the citations inserted by Mendeley's plugin.                   **
+'**  Removes the hyperlinks generated by GAUG_createHyperlinksForCitations* in the bibliography inserted by Mendeley's plugin.                **
+'**  Removes all manual modifications to the citations and bibliography if specified                                                          **
+'**                                                                                                                                           **
+'**  Parameter strTypeOfExecution can have three different values:                                                                            **
+'**  "RemoveHyperlinks":                                                                                                                      **
+'**     UNEXPECTED RESULTS IF MANUAL MODIFICATIONS EXIST, BUT THE FASTEST                                                                     **
+'**        Removes the bookmarks and hyperlinks                                                                                               **
+'**        Manual modifications to citations and bibliography will remain intact                                                              **
+'**  "CleanEnvironment": (only available when Mendeley Desktop 1.x is used)                                                                   **
+'**     EXPERIMENTAL, BUT VERY FAST                                                                                                           **
+'**        Removes the bookmarks and hyperlinks                                                                                               **
+'**        Manual modifications to citations and bibliography will also be removed to have a clean environment                                **
+'**  "CleanFullEnvironment": (only available when Mendeley Desktop 1.x is used)                                                               **
+'**     SAFE, BUT VERY SLOW IN LONG DOCUMENTS                                                                                                 **
+'**        Removes the bookmarks and hyperlinks                                                                                               **
+'**        Manual modifications to citations and bibliography will also be removed to have a clean environment                                **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
 Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As String = "RemoveHyperlinks")
 
     Dim intAvailableMendeleyVersion, intUseMendeleyVersion As Integer
@@ -2317,17 +2530,16 @@ End Sub
 
 
 
-'*****************************************************************************************
-'*****************************************************************************************
-'**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-01-11                                                          **
-'**                                                                                     **
-'**  Sub GAUG_removeHyperlinks()                                                        **
-'**                                                                                     **
-'**  Calls Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String)          **
-'**     with parameter strTypeOfExecution = "RemoveHyperlinks"                          **
-'*****************************************************************************************
-'*****************************************************************************************
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2017-01-11                                                                                                                **
+'**                                                                                                                                           **
+'**  Sub GAUG_removeHyperlinks()                                                                                                              **
+'**                                                                                                                                           **
+'**  Calls Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String) with parameter strTypeOfExecution = "RemoveHyperlinks"         **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
 Sub GAUG_removeHyperlinks()
     'removes all bookmarks and hyperlinks from the citations and bibliography
     Call GAUG_removeHyperlinksForCitations("RemoveHyperlinks")
@@ -2335,17 +2547,16 @@ End Sub
 
 
 
-'*****************************************************************************************
-'*****************************************************************************************
-'**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-01-11                                                          **
-'**                                                                                     **
-'**  Sub GAUG_cleanEnvironment()                                                        **
-'**                                                                                     **
-'**  Calls Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String)          **
-'**     with parameter strTypeOfExecution = "CleanEnvironment"                          **
-'*****************************************************************************************
-'*****************************************************************************************
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2017-01-11                                                                                                                **
+'**                                                                                                                                           **
+'**  Sub GAUG_cleanEnvironment()                                                                                                              **
+'**                                                                                                                                           **
+'**  Calls Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String) with parameter strTypeOfExecution = "CleanEnvironment"         **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
 Sub GAUG_cleanEnvironment()
     'removes all bookmarks, hyperlinks and manual modifications to the citations and bibliography
     Call GAUG_removeHyperlinksForCitations("CleanEnvironment")
@@ -2353,17 +2564,16 @@ End Sub
 
 
 
-'*****************************************************************************************
-'*****************************************************************************************
-'**  Author: José Luis González García                                                  **
-'**  Last modified: 2017-01-11                                                          **
-'**                                                                                     **
-'**  Sub GAUG_cleanFullEnvironment()                                                    **
-'**                                                                                     **
-'**  Calls Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String)          **
-'**     with parameter strTypeOfExecution = "CleanFullEnvironment"                      **
-'*****************************************************************************************
-'*****************************************************************************************
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2017-01-11                                                                                                                **
+'**                                                                                                                                           **
+'**  Sub GAUG_cleanFullEnvironment()                                                                                                          **
+'**                                                                                                                                           **
+'**  Calls Sub GAUG_removeHyperlinksForCitations(strTypeOfExecution As String) with parameter strTypeOfExecution = "CleanFullEnvironment"     **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
 Sub GAUG_cleanFullEnvironment()
     'removes all bookmarks, hyperlinks and manual modifications to the citations and bibliography
     Call GAUG_removeHyperlinksForCitations("CleanFullEnvironment")
