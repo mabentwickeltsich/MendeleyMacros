@@ -1,8 +1,718 @@
 Attribute VB_Name = "MendeleyMacros"
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-02                                                                                                                **
+'**                                                                                                                                           **
+'**  Function GAUG_getAvailableMendeleyVersion(Optional intUseMendeleyVersion As Integer = 0) As Integer                                      **
+'**                                                                                                                                           **
+'**  Finds the available version of Mendeley.                                                                                                 **
+'**  The version can be overridden by the optional parameter intUseMendeleyVersion,                                                           **
+'**     useful if the macros fail to detect the correct version.                                                                              **
+'**                                                                                                                                           **
+'**  Parameter intUseMendeleyVersion can have three different values:                                                                         **
+'**  0: (DEFAULT)                                                                                                                             **
+'**     Autodetect Mendeley's version                                                                                                         **
+'**  1:                                                                                                                                       **
+'**     Use version 1.x of Mendeley Desktop                                                                                                   **
+'**  2:                                                                                                                                       **
+'**     Use version 2.x of Mendeley Reference Manager                                                                                         **
+'**                                                                                                                                           **
+'**  RETURNS: An integer with the major version number of Mendeley that is installed.                                                         **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+Function GAUG_getAvailableMendeleyVersion(Optional ByVal intUseMendeleyVersion As Integer = 0) As Integer
+
+    Dim intAvailableMendeleyVersion As Integer
+    Dim blnFound As Boolean
+    Dim fldField As Field
+    Dim ccContentControl As ContentControl
+
+
+    'if the optional argument is not within valid versions
+    If intUseMendeleyVersion < 0 Or intUseMendeleyVersion > 2 Then
+        MsgBox "The version " & intUseMendeleyVersion & " of Mendeley's plugin is not valid." & vbCrLf & vbCrLf & _
+            "Use version 1 or version 2 instead," & vbCrLf & _
+            "or 0 for the macros to automatically detect it." & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_getAvailableMendeleyVersion(intUseMendeleyVersion)"
+
+        'stops the execution
+        End
+    End If
+
+
+    'if the macros must automatically detect the version of Mendeley's plugin
+    If intUseMendeleyVersion = 0 Then
+        blnFound = False
+        'checks all fields in the document
+        For Each fldField In ActiveDocument.Fields
+            'if this is a citation by Mendeley Desktop 1.x
+            If fldField.Type = wdFieldAddin And Left(fldField.Code, 18) = "ADDIN CSL_CITATION" Then
+                blnFound = True
+                'sets available version to 1
+                intAvailableMendeleyVersion = 1
+                'exits loop
+                Exit For
+            End If
+        Next fldField
+
+        'if version 1.x was not found, tries to detect if 2.x is installed
+        If Not blnFound Then
+            'checks all content controls in the document
+            For Each ccContentControl In ActiveDocument.ContentControls
+                'if this is a citation by Mendeley Reference Manager 2.x
+                If ccContentControl.Type = wdContentControlRichText And Left(Trim(ccContentControl.Tag), 21) = "MENDELEY_CITATION_v3_" Then
+                    blnFound = True
+                    'sets available version to 2
+                    intAvailableMendeleyVersion = 2
+                    'exits loop
+                    Exit For
+                End If
+            Next ccContentControl
+        End If
+
+        'if the macros could not detect the version of Mendeley's plugin
+        '(there are no citations added by Mendeley in the entire document)
+        If Not blnFound Then
+            MsgBox "The version of Mendeley's plugin could not be detected." & vbCrLf & vbCrLf & _
+                "Cannot continue creating hyperlinks.", _
+                vbCritical, "GAUG_getAvailableMendeleyVersion(intUseMendeleyVersion)"
+
+            'stops the execution
+            End
+        End If
+
+    'if the user has specified the version of Mendeley's plugin
+    Else
+        'overrides the available version
+        intAvailableMendeleyVersion = intUseMendeleyVersion
+    End If
+
+    'returns the available version of Mendeley
+    GAUG_getAvailableMendeleyVersion = intAvailableMendeleyVersion
+
+End Function
+
+
+
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-02                                                                                                                **
+'**                                                                                                                                           **
+'**  Function GAUG_getAllCitationsFullInformation(intMendeleyVersion As Integer) As String                                                    **
+'**                                                                                                                                           **
+'**  Finds and returns the full information of all citations, when available.                                                                 **
+'**                                                                                                                                           **
+'**  Parameter intMendeleyVersion can have two different values:                                                                              **
+'**  1:                                                                                                                                       **
+'**     Use version 1.x of Mendeley Desktop                                                                                                   **
+'**        The function returns an empty string due to the fact that                                                                          **
+'**        Mendeley Desktop stores the information of each citation inside the field of the citation                                          **
+'**  2:                                                                                                                                       **
+'**     Use version 2.x of Mendeley Reference Manager                                                                                         **
+'**        The function returns the information of all citations in a single string                                                           **
+'**                                                                                                                                           **
+'**  RETURNS: A string that contains all the information of all citations (when Mendeley Reference Manager 2.x is available).                 **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer) As String
+
+    Dim objRegExpWordOpenXMLCitations As RegExp
+    Dim colMatchesWordOpenXMLCitations As MatchCollection
+    Dim objMatchWordOpenXMLCitations As match
+    Dim strAllCitationsFullInformation As String
+    Dim blnFound As Boolean
+
+
+    'if the argument is not within valid versions
+    If intMendeleyVersion < 1 Or intMendeleyVersion > 2 Then
+        MsgBox "The version " & intMendeleyVersion & " of Mendeley's plugin is not valid." & vbCrLf & vbCrLf & _
+            "Use version 1 or version 2 instead," & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_getAllCitationsFullInformation(intMendeleyVersion)"
+
+        'stops the execution
+        End
+    End If
+
+
+    'initialize the flag
+    blnFound = False
+
+
+    Select Case intMendeleyVersion
+        'Mendeley Desktop 1.x is installed
+        Case 1
+            blnFound = True
+            'nothing to do here, Mendeley Desktop 1.x does not provide the information of all citations as a single block of information
+            strAllCitationsFullInformation = ""
+
+        'Mendeley Reference Manager 2.x is installed
+        Case 2
+            Set objRegExpWordOpenXMLCitations = New RegExp
+            'ActiveDocument.WordOpenXML contains everything on the document, including hidden information about the citations added by Mendeley's plugin
+            'we need that hidden information to be able to match every citation to the corresponding entry in the bibliography
+            '(the information is stored as one block of data within WordOpenXML)
+            'sets the pattern to match everything from '<we:property name="MENDELEY_CITATIONS"' to (but not including) '<we:property name="MENDELEY_CITATIONS_STYLE"' or '</we:properties><we:bindings/>'
+            'for details on the regular expression, see https://stackoverflow.com/questions/7124778/how-can-i-match-anything-up-until-this-sequence-of-characters-in-a-regular-exp
+            objRegExpWordOpenXMLCitations.Pattern = "<we:property name=\" & Chr(34) & "MENDELEY_CITATIONS\" & Chr(34) & ".+?(?=((<we:property name=\" & Chr(34) & "MENDELEY_CITATIONS_STYLE\" & Chr(34) & ")|(</we:properties><we:bindings/>)))"
+            'sets case insensitivity
+            objRegExpWordOpenXMLCitations.IgnoreCase = False
+            'sets global applicability
+            objRegExpWordOpenXMLCitations.Global = True
+
+            'checks that the string can be compared
+            If (objRegExpWordOpenXMLCitations.Test(ActiveDocument.WordOpenXML) = True) Then
+                'gets the matches (all information of citations according to the regular expression)
+                Set colMatchesWordOpenXMLCitations = objRegExpWordOpenXMLCitations.Execute(ActiveDocument.WordOpenXML)
+
+                'there should be only one match which contains the information of all citations
+                If colMatchesWordOpenXMLCitations.Count = 1 Then
+                    blnFound = True
+                    'treats all matches (the only one)
+                    For Each objMatchWordOpenXMLCitations In colMatchesWordOpenXMLCitations
+                        'replaces all '&quot;' by '"' to handle the string more easily
+                        strAllCitationsFullInformation = Replace(objMatchWordOpenXMLCitations.value, "&quot;", Chr(34))
+                    Next objMatchWordOpenXMLCitations
+                End If
+            End If
+    End Select
+
+
+    'if no information could be found (or many matches where found which is not expected)
+    If Not blnFound Then
+        MsgBox "Could not find ONLY one match when looking for the full information of all citations." & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_getAllCitationsFullInformation(intMendeleyVersion)"
+
+        'stops the execution
+        End
+    End If
+
+
+    'returns the string that contains all the information of all citations (when Mendeley Reference Manager 2.x is available)
+    GAUG_getAllCitationsFullInformation = strAllCitationsFullInformation
+
+End Function
+
+
+
+'*****************************************************************************************************************************************************************************************
+'*****************************************************************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                                                                  **
+'**  Last modified: 2024-10-02                                                                                                                                                          **
+'**                                                                                                                                                                                     **
+'**  GAUG_getCitationFullInfo(intMendeleyVersion As Integer, strAllCitationsFullInformation As String, fldCitation As Field, ccCitation As ContentControl) As String                    **
+'**                                                                                                                                                                                     **
+'**  Finds and returns the full information of a particular citation.                                                                                                                   **
+'**                                                                                                                                                                                     **
+'**  Parameter intMendeleyVersion can have two different values:                                                                                                                        **
+'**  1:                                                                                                                                                                                 **
+'**     Use version 1.x of Mendeley Desktop                                                                                                                                             **
+'**  2:                                                                                                                                                                                 **
+'**     Use version 2.x of Mendeley Reference Manager                                                                                                                                   **
+'**  Parameter strAllCitationsFullInformation is a string that contains all information of all citations when Mendeley Reference Manager 2.x is used                                    **
+'**  Parameter fldCitation is the citation's field when Mendeley Desktop 1.x is used                                                                                                    **
+'**  Parameter ccCitation is the citation's contet control when Mendeley Reference Manager 2.x is used                                                                                  **
+'**                                                                                                                                                                                     **
+'**  RETURNS: A string that contains all the information of the citation.                                                                                                               **
+'*****************************************************************************************************************************************************************************************
+'*****************************************************************************************************************************************************************************************
+Function GAUG_getCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal strAllCitationsFullInformation As String, ByVal fldCitation As Field, ByVal ccCitation As ContentControl) As String
+
+    Dim objRegExpVisibleCitationItems As RegExp
+    Dim colMatchesVisibleCitationItems As MatchCollection
+    Dim objMatchVisibleCitationItem As match
+    Dim strCitationFullInfo As String
+    Dim blnFound As Boolean
+
+
+    'if the argument is not within valid versions
+    If intMendeleyVersion < 1 Or intMendeleyVersion > 2 Then
+        MsgBox "The version " & intMendeleyVersion & " of Mendeley's plugin is not valid." & vbCrLf & vbCrLf & _
+            "Use version 1 or version 2 instead," & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_getCitationFullInfo(intMendeleyVersion, strAllCitationsFullInformation, fldCitation, ccCitation)"
+
+        'stops the execution
+        End
+    End If
+
+
+    'initialize the flag
+    blnFound = False
+    'initializes the variable
+    strCitationFullInfo = ""
+
+    Select Case intMendeleyVersion
+        'Mendeley Desktop 1.x is installed
+        Case 1
+            'if the citation's field is not empty
+            If Not (fldCitation Is Nothing) Then
+                blnFound = True
+                'the full information of the cition is inside the citation's field
+                strCitationFullInfo = fldCitation.Code
+            End If
+
+        'Mendeley Reference Manager 2.x is installed
+        Case 2
+            'if the citation's content control is not empty
+            If Not (ccCitation Is Nothing) Then
+
+                Set objRegExpVisibleCitationItems = New RegExp
+                'sets the pattern to match everything from '"citationID":"MENDELEY_CITATION_' to (but not including) '"citationID":"MENDELEY_CITATION_' or to the end of the string
+                'this gets individual citations, then the correct one can be selected
+                objRegExpVisibleCitationItems.Pattern = "{\" & Chr(34) & "citationID\" & Chr(34) & ":\" & Chr(34) & "MENDELEY_CITATION_.+?(?=(({\" & Chr(34) & "citationID\" & Chr(34) & ":\" & Chr(34) & "MENDELEY_CITATION_)|($)))"
+                'sets case insensitivity
+                objRegExpVisibleCitationItems.IgnoreCase = False
+                'sets global applicability
+                objRegExpVisibleCitationItems.Global = True
+
+                'checks that the string can be compared
+                If (objRegExpVisibleCitationItems.Test(strAllCitationsFullInformation) = True) Then
+                    'gets the matches (all information of individual citations according to the regular expression)
+                    Set colMatchesVisibleCitationItems = objRegExpVisibleCitationItems.Execute(strAllCitationsFullInformation)
+
+                    'treats all matches (all individual citations) to find the correct one
+                    For Each objMatchVisibleCitationItem In colMatchesVisibleCitationItems
+                        'if the tag of the searched citation is in the current match
+                        If InStr(1, objMatchVisibleCitationItem.value, ccCitation.Tag, 1) > 0 Then
+                            blnFound = True
+                            'the full information of the cition is in this match
+                            strCitationFullInfo = objMatchVisibleCitationItem.value
+                            'exits loop
+                            Exit For
+                        End If
+                    Next objMatchVisibleCitationItem
+                End If 'checks that the string can be compared
+
+            End If 'if the citation's content control is not empty
+    End Select
+
+
+    'if no information could be found
+    If Not blnFound Then
+        MsgBox "Could not find the full information of the citation." & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_getCitationFullInfo(intMendeleyVersion, strAllCitationsFullInformation, fldCitation, ccCitation)"
+
+        'stops the execution
+        End
+    End If
+
+
+    'returns the citation information
+    GAUG_getCitationFullInfo = strCitationFullInfo
+
+End Function
+
+
+
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-02                                                                                                                **
+'**                                                                                                                                           **
+'**  Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As Integer,                                                  **
+'**     ByVal strCitationFullInfo As String) As Variant()                                                                                     **
+'**                                                                                                                                           **
+'**  Returns the full information of all the individual items of a particular citation.                                                       **
+'**                                                                                                                                           **
+'**  Parameter intMendeleyVersion can have two different values:                                                                              **
+'**  1:                                                                                                                                       **
+'**     Use version 1.x of Mendeley Desktop                                                                                                   **
+'**  2:                                                                                                                                       **
+'**     Use version 2.x of Mendeley Reference Manager                                                                                         **
+'**  Parameter strCitationFullInfo is a string that contains the full information of the citation                                             **
+'**                                                                                                                                           **
+'**  RETURNS: An array that contains the full information of all the individual items of the citation.                                        **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal strCitationFullInfo As String) As Variant()
+
+    Dim varCitationItemsFromCitationFullInfo() As Variant
+    Dim intTotalCitationItems As Integer
+
+    Dim objRegExpCitationItems As RegExp
+    Dim colMatchesCitationItems As MatchCollection
+    Dim objMatchVisibleCitationItemItem As match
+
+
+    'if the argument is not within valid versions
+    If intMendeleyVersion < 1 Or intMendeleyVersion > 2 Then
+        MsgBox "The version " & intMendeleyVersion & " of Mendeley's plugin is not valid." & vbCrLf & vbCrLf & _
+            "Use version 1 or version 2 instead," & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_getCitationItemsFromCitationFullInfo(intMendeleyVersion, strCitationFullInfo)"
+
+        'stops the execution
+        End
+    End If
+
+
+    'if the citation's full info is not empty
+    If Not (strCitationFullInfo = "") Then
+
+        Set objRegExpCitationItems = New RegExp
+        'sets case insensitivity
+        objRegExpCitationItems.IgnoreCase = False
+        'sets global applicability
+        objRegExpCitationItems.Global = True
+
+        'initializes the counter
+        intTotalCitationItems = 0
+
+        'builds the regular expression according to the version of Mendeley
+        Select Case intMendeleyVersion
+            'Mendeley Desktop 1.x is installed
+            Case 1
+                    'sets the pattern to match everything from '{"id":"ITEM' to (but not including) ',{"id":"ITEM' or to the end of the string if no other item is found
+                    'this gets individual citation items
+                    objRegExpCitationItems.Pattern = "{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34) & "ITEM.+?(?=((,\s*{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34) & "ITEM)|($)))"
+
+            'Mendeley Reference Manager 2.x is installed
+            Case 2
+                    'sets the pattern to match everything from '{"id":"' to (but not including) ',{"id":"' or to the end of the string if no other item is found
+                    'this gets individual citation items
+                    objRegExpCitationItems.Pattern = "{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34) & ".+?(?=((,\s*{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34) & ")|($)))"
+        End Select
+
+
+        'checks that the string can be compared
+        If (objRegExpCitationItems.Test(strCitationFullInfo) = True) Then
+            'gets the matches (individual citation items according to the regular expression)
+            Set colMatchesCitationItems = objRegExpCitationItems.Execute(strCitationFullInfo)
+
+            'treats all matches (all individual citation items)
+            For Each objMatchVisibleCitationItemItem In colMatchesCitationItems
+                'MsgBox objMatchVisibleCitationItemItem.value
+                'updates the counter to include this citation item
+                intTotalCitationItems = intTotalCitationItems + 1
+                'adds the full information of the citation item to the list
+                ReDim Preserve varCitationItemsFromCitationFullInfo(1 To intTotalCitationItems)
+                varCitationItemsFromCitationFullInfo(intTotalCitationItems) = objMatchVisibleCitationItemItem.value
+            Next objMatchVisibleCitationItemItem
+        End If 'checks that the string can be compared
+
+    End If 'if the citation's full info is not empty
+
+
+    'returns the list of all items (individual citations within the field or content control) from the citation full information
+    GAUG_getCitationItemsFromCitationFullInfo = varCitationItemsFromCitationFullInfo
+
+End Function
+
+
+
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-02                                                                                                                **
+'**                                                                                                                                           **
+'**  Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal strAuthorEditor As String,                    **
+'**     ByVal strCitationItem As String) As Variant()                                                                                         **
+'**                                                                                                                                           **
+'**  Returns the list of authors or editors of the individual citation item.                                                                  **
+'**                                                                                                                                           **
+'**  Parameter intMendeleyVersion can have two different values:                                                                              **
+'**  1:                                                                                                                                       **
+'**     Use version 1.x of Mendeley Desktop                                                                                                   **
+'**  2:                                                                                                                                       **
+'**     Use version 2.x of Mendeley Reference Manager                                                                                         **
+'**  Parameter strAuthorEditor can have two different values:                                                                                 **
+'**  "author":                                                                                                                                **
+'**     Retrieve the authors of the individual citation item                                                                                  **
+'**  "editor":                                                                                                                                **
+'**     Retrieve the editors of the individual citation item                                                                                  **
+'**  Parameter strCitationItem is a string that contains the full information of the citation item                                            **
+'**                                                                                                                                           **
+'**  RETURNS: An array that contains the list of authors or editors of the citation item.                                                     **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal strAutorEditor As String, ByVal strCitationItem As String) As Variant()
+
+    Dim varAuthorsFomCitationItem() As Variant
+    Dim intTotalAuthorsEditorsFromCitationItem As Integer
+    Dim strFamilyName As String
+
+    Dim objRegExpAuthorsFromCitationItem, objRegExpAuthorFamilyNamesFromCitationItem As RegExp
+    Dim colMatchesAuthorsFromCitationItem, colMatchesAuthorFamilyNamesFromCitationItem As MatchCollection
+    Dim objMatchAuthorFromCitationItem, objMatchAuthorFamilyNameFromCitationItem As match
+
+
+    'if the argument is not within valid versions
+    If intMendeleyVersion < 1 Or intMendeleyVersion > 2 Then
+        MsgBox "The version " & intMendeleyVersion & " of Mendeley's plugin is not valid." & vbCrLf & vbCrLf & _
+            "Use version 1 or version 2 instead," & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_getAuthorsEditorsFromCitationItem(intMendeleyVersion, strCitationItem)"
+
+        'stops the execution
+        End
+    End If
+
+
+    'if the citation item's full info is not empty
+    If Not (strCitationItem = "") Then
+
+        Set objRegExpAuthorsFromCitationItem = New RegExp
+        'sets case insensitivity
+        objRegExpAuthorsFromCitationItem.IgnoreCase = False
+        'sets global applicability
+        objRegExpAuthorsFromCitationItem.Global = True
+
+        'builds the regular expression according to the version of Mendeley
+        Select Case intMendeleyVersion
+            'Mendeley Desktop 1.x is installed
+            Case 1
+                    'sets the pattern to match everything from '"author":[' or '"editor":[' to (but not including) ']'
+                    'this gets the full list of authors from the citation item
+                    objRegExpAuthorsFromCitationItem.Pattern = "\" & Chr(34) & strAutorEditor & "\" & Chr(34) & "\s*:\s*\[.+?(?=\])"
+
+            'Mendeley Reference Manager 2.x is installed
+            Case 2
+                    'sets the pattern to match everything from '"author":[' or '"editor":[' to (but not including) ']'
+                    'this gets the full list of authors from the citation item
+                    objRegExpAuthorsFromCitationItem.Pattern = "\" & Chr(34) & strAutorEditor & "\" & Chr(34) & "\s*:\s*\[.+?(?=\])"
+        End Select
+
+
+        'checks that the string can be compared
+        If (objRegExpAuthorsFromCitationItem.Test(strCitationItem) = True) Then
+            'gets the matches (list of all authors as a single block of data)
+            Set colMatchesAuthorsFromCitationItem = objRegExpAuthorsFromCitationItem.Execute(strCitationItem)
+
+            'treats all matches (there should be at most one match, zero when editors are listed instead of the authors)
+            For Each objMatchAuthorFromCitationItem In colMatchesAuthorsFromCitationItem
+
+                Set objRegExpAuthorFamilyNamesFromCitationItem = New RegExp
+                'sets case insensitivity
+                objRegExpAuthorFamilyNamesFromCitationItem.IgnoreCase = False
+                'sets global applicability
+                objRegExpAuthorFamilyNamesFromCitationItem.Global = True
+
+                'initializes the counter
+                intTotalAuthorsEditorsFromCitationItem = 0
+
+                'builds the regular expression according to the version of Mendeley
+                Select Case intMendeleyVersion
+                    'Mendeley Desktop 1.x is installed
+                    Case 1
+                            'sets the pattern to match everything from '"family":"' to (but not including) '"'
+                            'this gets the family names of authors from the citation item
+                            objRegExpAuthorFamilyNamesFromCitationItem.Pattern = "\" & Chr(34) & "family\" & Chr(34) & "\s*:\s*\" & Chr(34) & ".+?(?=\" & Chr(34) & ")"
+
+                    'Mendeley Reference Manager 2.x is installed
+                    Case 2
+                            'sets the pattern to match everything from '{"family":"' to (but not including) '"'
+                            'this gets the family names of authors from the citation item
+                            objRegExpAuthorFamilyNamesFromCitationItem.Pattern = "{\s*\" & Chr(34) & "family\" & Chr(34) & "\s*:\s*\" & Chr(34) & ".+?(?=\" & Chr(34) & ")"
+                End Select
+
+
+                'checks that the string can be compared
+                If (objRegExpAuthorFamilyNamesFromCitationItem.Test(objMatchAuthorFromCitationItem.value) = True) Then
+                    'gets the matches (the family names of all authors)
+                    Set colMatchesAuthorFamilyNamesFromCitationItem = objRegExpAuthorFamilyNamesFromCitationItem.Execute(objMatchAuthorFromCitationItem.value)
+
+                    'treats all matches (the family name of the authors, if any)
+                    For Each objMatchAuthorFamilyNameFromCitationItem In colMatchesAuthorFamilyNamesFromCitationItem
+                        'gets only the family name, without the extra characters in the match
+                        'from '{"family":"FamilyName' to just "FamilyName"
+                        strFamilyName = Right(objMatchAuthorFamilyNameFromCitationItem.value, Len(objMatchAuthorFamilyNameFromCitationItem.value) - InStr(objMatchAuthorFamilyNameFromCitationItem.value, ":") - 1)
+                        'updates the counter to include this family name of the author
+                        intTotalAuthorsEditorsFromCitationItem = intTotalAuthorsEditorsFromCitationItem + 1
+                        'adds the family name of the author to the list
+                        ReDim Preserve varAuthorsFomCitationItem(1 To intTotalAuthorsEditorsFromCitationItem)
+                        varAuthorsFomCitationItem(intTotalAuthorsEditorsFromCitationItem) = strFamilyName
+                    Next objMatchAuthorFamilyNameFromCitationItem
+                End If 'checks that the string can be compared
+
+
+            Next objMatchAuthorFromCitationItem 'treats all matches (there should be at most one match, zero when editors are listed instead of the authors)
+
+        End If 'checks that the string can be compared
+
+    End If 'if the citation's full info is not empty
+
+
+    'returns the list of the family names of the authors
+    GAUG_getAuthorsEditorsFromCitationItem = varAuthorsFomCitationItem
+
+End Function
+
+
+
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-02                                                                                                                **
+'**                                                                                                                                           **
+'**  Function GAUG_getYearFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal strCitationItem As String) As String                    **
+'**                                                                                                                                           **
+'**  Returns the year of issue of the individual citation item.                                                                               **
+'**                                                                                                                                           **
+'**  Parameter intMendeleyVersion can have two different values:                                                                              **
+'**  1:                                                                                                                                       **
+'**     Use version 1.x of Mendeley Desktop                                                                                                   **
+'**  2:                                                                                                                                       **
+'**     Use version 2.x of Mendeley Reference Manager                                                                                         **
+'**  Parameter strCitationItem is a string that contains the full information of the citation item                                            **
+'**                                                                                                                                           **
+'**  RETURNS: A string with the year of issue of the citation item (it does not include the letter that may be present after the year).       **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+Function GAUG_getYearFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal strCitationItem As String) As String
+
+    Dim strYearFromCitationItem As String
+
+    Dim objRegExpYearFromCitationItem As RegExp
+    Dim colMatchesYearFromCitationItem As MatchCollection
+    Dim objMatchYearFromCitationItem As match
+
+
+    'if the argument is not within valid versions
+    If intMendeleyVersion < 1 Or intMendeleyVersion > 2 Then
+        MsgBox "The version " & intMendeleyVersion & " of Mendeley's plugin is not valid." & vbCrLf & vbCrLf & _
+            "Use version 1 or version 2 instead," & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_getYearFromCitationItem(intMendeleyVersion, strCitationItem)"
+
+        'stops the execution
+        End
+    End If
+
+
+    'if the citation item's full info is not empty
+    If Not (strCitationItem = "") Then
+
+        Set objRegExpYearFromCitationItem = New RegExp
+        'sets case insensitivity
+        objRegExpYearFromCitationItem.IgnoreCase = False
+        'sets global applicability
+        objRegExpYearFromCitationItem.Global = True
+
+        'builds the regular expression according to the version of Mendeley
+        Select Case intMendeleyVersion
+            'Mendeley Desktop 1.x is installed
+            Case 1
+                    'sets the pattern to match everything from '"issued":{"date-parts":[[' to (but not including) ']]' or ','
+                    'this gets only the year from the citation item, skips the month if present
+                    objRegExpYearFromCitationItem.Pattern = "\" & Chr(34) & "issued\" & Chr(34) & "\s*:\s*{\s*\" & Chr(34) & "date\-parts\" & Chr(34) & "\s*:\s*\[\s*\[.+?(?=((\s*\]\s*\])|(,)))"
+
+            'Mendeley Reference Manager 2.x is installed
+            Case 2
+                    'sets the pattern to match everything from '"issued":{"date-parts":[[' to (but not including) ']]' or ','
+                    'this gets only the year from the citation item, skips the month if present
+                    objRegExpYearFromCitationItem.Pattern = "\" & Chr(34) & "issued\" & Chr(34) & "\s*:\s*{\s*\" & Chr(34) & "date\-parts\" & Chr(34) & "\s*:\s*\[\s*\[.+?(?=((\s*\]\s*\])|(,)))"
+        End Select
+
+
+        'checks that the string can be compared
+        If (objRegExpYearFromCitationItem.Test(strCitationItem) = True) Then
+            'gets the matches (the year of issue)
+            Set colMatchesYearFromCitationItem = objRegExpYearFromCitationItem.Execute(strCitationItem)
+
+            'treats all matches (there should only one match)
+            For Each objMatchYearFromCitationItem In colMatchesYearFromCitationItem
+                'gets only the year, without the extra characters in the match
+                'from '"issued":{"date-parts":[["Year"' or '"issued":{"date-parts":[[Year' to just 'Year'
+                If Right(objMatchYearFromCitationItem.value, 1) = Chr(34) Then
+                    'takes only the year and removes existing '"'
+                    strYearFromCitationItem = Replace(Right(objMatchYearFromCitationItem.value, 5), Chr(34), "")
+                Else
+                    strYearFromCitationItem = Right(objMatchYearFromCitationItem.value, 4)
+                End If
+            Next objMatchYearFromCitationItem 'treats all matches (there should be at most one match, zero when editors are listed instead of the authors)
+        End If 'checks that the string can be compared
+
+    End If 'if the citation item's full info is not empty
+
+
+    'returns the year of issue
+    GAUG_getYearFromCitationItem = strYearFromCitationItem
+
+End Function
+
+
+
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-02                                                                                                                **
+'**                                                                                                                                           **
+'**  Function GAUG_getPartsFromVisibleCitationItem(ByVal strVisibleCitationItem As String) As Variant()                                       **
+'**                                                                                                                                           **
+'**  Returns the authors or editors (if present), year of issue and letter (if present) of a particular visible citation item.                **
+'**                                                                                                                                           **
+'**  Parameter strVisibleCitationItem is a string that contains the visible text of the citation item                                         **
+'**                                                                                                                                           **
+'**  RETURNS: An array that contains the authors or editors, the year of issue and the letter after the year of the visible citation item.    **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+Function GAUG_getPartsFromVisibleCitationItem(ByVal strVisibleCitationItem As String) As Variant()
+
+    Dim varPartsFromVisibleCitationItem(1 To 3) As Variant
+    Dim intSizeOfString As Integer
+
+
+    'initializes the parts to emtpy string
+    '(in some cases the authors will not be present or the year of issue does not have a letter at the end)
+    'e.g. in a citation such as '(FamilyName, 2024a, 2024b)', the second item in the citation is '2024b' (the first is 'FamilyName, 2024a') which does not include the author but includes a letter
+    'e.g. in a citation such as '(FamilyName, 2020; OtherFamilyName, 2023)', both items have authors but not letter at the end of the year
+    varPartsFromVisibleCitationItem(1) = ""
+    varPartsFromVisibleCitationItem(2) = ""
+    varPartsFromVisibleCitationItem(3) = ""
+
+
+    'removes leading or trailing blank spaces
+    strVisibleCitationItem = Trim(strVisibleCitationItem)
+
+
+    'if the citation item is not empty
+    If Not strVisibleCitationItem = "" Then
+        'gets the size of the string containing the visible citation item
+        intSizeOfString = Len(strVisibleCitationItem)
+
+        'if the citation item DOES NOT include a letter at the end of the year
+        If Asc(Right(strVisibleCitationItem, 1)) >= 48 And Asc(Right(strVisibleCitationItem, 1)) <= 57 Then
+            'if the visible citation item includes authors (or editors) its length is bigger than ', YYYY'
+            If intSizeOfString > 6 Then
+                'gets the authors or editors
+                varPartsFromVisibleCitationItem(1) = Mid(strVisibleCitationItem, 1, intSizeOfString - 6)
+            End If
+            'gets the year
+            varPartsFromVisibleCitationItem(2) = Mid(strVisibleCitationItem, intSizeOfString - 3, 4)
+
+        'if the citation item includes a letter at the end of the year
+        Else
+            'if the visible citation item includes authors (or editors) its length is bigger than ', YYYYx'
+            If intSizeOfString > 7 Then
+                'gets the authors or editors
+                varPartsFromVisibleCitationItem(1) = Mid(strVisibleCitationItem, 1, intSizeOfString - 7)
+            End If
+            'gets the year
+            varPartsFromVisibleCitationItem(2) = Mid(strVisibleCitationItem, intSizeOfString - 4, 4)
+            'gets the letter at the end of the year
+            varPartsFromVisibleCitationItem(3) = Right(strVisibleCitationItem, 1)
+        End If 'if the citation item DOES NOT include a letter at the end of the year
+
+    End If
+
+
+    'returns the three parts of the visible citation item
+    GAUG_getPartsFromVisibleCitationItem = varPartsFromVisibleCitationItem
+
+End Function
+
+
+
 '*****************************************************************************************
 '*****************************************************************************************
 '**  Author: José Luis González García                                                  **
-'**  Last modified: 2024-10-05                                                          **
+'**  Last modified: 2024-10-07                                                          **
 '**                                                                                     **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                         **
 '**                                                                                     **
@@ -16,14 +726,14 @@ Attribute VB_Name = "MendeleyMacros"
 '*****************************************************************************************
 Sub GAUG_createHyperlinksForCitationsAPA()
 
+    Dim intAvailableMendeleyVersion, intUseMendeleyVersion As Integer
     Dim documentSection As Section
-    Dim sectionField As Field
-    Dim blnFound, blnBibliographyFound, blnReferenceEntryFound, blnCitationEntryFound, blnCitationEntryPositionFound, blnEditorsFound, blnAuthorsFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
-    Dim intRefereceNumber, intCitationEntryPosition, i As Integer
+    Dim blnFound, blnBibliographyFound, blnCitationFound, blnReferenceEntryFound, blnCitationEntryFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
+    Dim intRefereceNumber, i As Integer
     Dim objRegExpBiblioEntries, objRegExpVisibleCitationItems, objRegExpFindHiddenCitationItems, objRegExpFindBiblioEntry, objRegExpFindVisibleCitationItem, objRegExpURL As RegExp
     Dim colMatchesBiblioEntries, colMatchesVisibleCitationItems, colMatchesFindHiddenCitationItems, colMatchesFindBiblioEntry, colMatchesFindVisibleCitationItem, colMatchesURL As MatchCollection
     Dim objMatchBiblioEntry, objMatchVisibleCitationItem, objMatchsFindHiddenCitationItem, objMatchFindBiblioEntry, objMatchURL As match
-    Dim strTempMatch, strSubStringOfTempMatch, strLastAuthors, strLastYear As String
+    Dim strTempMatch, strSubStringOfTempMatch, strLastAuthors As String
     Dim strTypeOfExecution As String
     Dim blnMabEntwickeltSich As Boolean
     Dim stlStyleInDocument As Word.Style
@@ -31,11 +741,32 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim blnStyleForTitleOfBibliographyFound As Boolean
     Dim strURL As String
     Dim arrNonDetectedURLs, varNonDetectedURL As Variant
+    Dim strDoHyperlinksExist As String
+    Dim intTotalNumberOfFieldsOrContentControls, intIndexCurrentFieldOrContentControl As Integer
+    Dim objCurrentFieldOrContentControl As Object
+    Dim strAllCitationsFullInformation, strCitationFullInfo As String
+    Dim varCitationItemsFromCitationFullInfo() As Variant
+    Dim varPartsFromVisibleCitationItem() As Variant
+    Dim varAuthorsFomCitationItem() As Variant
+    Dim varEditorsFomCitationItem() As Variant
+    Dim varYearFomCitationItem As String
+    Dim intAuthorFromCitationItem, intEditorFomCitationItem As Integer
+    Dim intCitationItemFromCitationFullInfo As Integer
+    Dim strOrphanCitationItems As String
+    Dim varFieldsOrContentControls As Variant
+    Dim currentPosition As range
 
 
 '*****************************
 '*   Custom configuration    *
 '*****************************
+    'possible values are 0, 1 or 2
+    'SEE DOCUMENTATION
+    'set to 0 if the macros should automatically detect the version of Mendeley
+    'set to 1 if the macros should use Mendeley Desktop 1.x (with the MS Word plugin Mendeley Cite-O-Matic)
+    'set to 2 if the macros should use Mendeley Reference Manager 2.x (with the App Mendeley Cite)
+    intUseMendeleyVersion = 0
+
     'SEE DOCUMENTATION
     'specifies the name of the font style used for the title of the bibliography
     strStyleForTitleOfBibliography = "Titre de dernière section"
@@ -62,6 +793,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
     'possible values are "RemoveHyperlinks", "CleanEnvironment" and "CleanFullEnvironment"
     'SEE DOCUMENTATION
+    'When Mendeley Reference Manager 2.x is used, ONLY "RemoveHyperlinks" is available
     strTypeOfExecution = "RemoveHyperlinks"
 
 
@@ -93,6 +825,15 @@ Sub GAUG_createHyperlinksForCitationsAPA()
         End
     End If
 
+    'gets the version of Mendeley (autodetect or specified)
+    intAvailableMendeleyVersion = GAUG_getAvailableMendeleyVersion(intUseMendeleyVersion)
+
+    'gets all the hidden information of all the citations (if Mendeley Reference Manager 2.x is used)
+    strAllCitationsFullInformation = GAUG_getAllCitationsFullInformation(intAvailableMendeleyVersion)
+    
+    'gets the current position of the cursor on the document
+    Set currentPosition = Selection.range
+
 
 
 
@@ -119,7 +860,6 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Set objRegExpBiblioEntries = New RegExp
     'sets the pattern to match every reference entry in the bibliography (it may include a character of carriage return)
     '(all text from the beginning of the string, or carriage return, until a year between parentheses is found)
-    'objRegExpBiblioEntries.Pattern = "((^)|(\r))[^(\r)]*\(\d\d\d\d[a-zA-Z]?\)"
     'updated to include "(Ed.)" and "(Eds.)" when editors are used for the citations and bibliography
     objRegExpBiblioEntries.Pattern = "((^)|(\r))[^(\r)]*(\(Eds?\.\)\.\s)?\(\d\d\d\d[a-zA-Z]?\)"
     'sets case insensitivity
@@ -157,16 +897,54 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
         'checks if the bibliography is in this section
         If blnFound Then
-            'checks all fields
-            For Each sectionField In documentSection.range.Fields
+            'according to the version of Mendeley
+            Select Case intAvailableMendeleyVersion
+                'Mendeley Desktop 1.x is installed
+                Case 1
+                        'gets the list of fields in this section
+                        Set varFieldsOrContentControls = documentSection.range.Fields
+                'Mendeley Reference Manager 2.x is installed
+                Case 2
+                        'gets the list of content controls in this section
+                        Set varFieldsOrContentControls = documentSection.range.ContentControls
+            End Select
+
+            'checks all fields or content controls
+            For Each objCurrentFieldOrContentControl In varFieldsOrContentControls
+
+                'according to the version of Mendeley
+                Select Case intAvailableMendeleyVersion
+                    'Mendeley Desktop 1.x is installed
+                    Case 1
+                            'checks if it is the bibliography
+                            If objCurrentFieldOrContentControl.Type = wdFieldAddin And Trim(objCurrentFieldOrContentControl.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
+                                blnBibliographyFound = True
+                            End If
+                    'Mendeley Reference Manager 2.x is installed
+                    Case 2
+                            'checks if it is the bibliograpy
+                            If objCurrentFieldOrContentControl.Type = wdContentControlRichText And Trim(objCurrentFieldOrContentControl.Tag) = "MENDELEY_BIBLIOGRAPHY" Then
+                                blnBibliographyFound = True
+                            End If
+                End Select
+
+
                 'if it is the bibliography
-                If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
-                    blnBibliographyFound = True
+                If blnBibliographyFound Then
                     'start the numbering
                     intRefereceNumber = 1
 
-                    'selects the current field (Mendeley's bibliography field)
-                    sectionField.Select
+                    'according to the version of Mendeley
+                    Select Case intAvailableMendeleyVersion
+                        'Mendeley Desktop 1.x is installed
+                        Case 1
+                                'selects the current field (Mendeley's bibliography field)
+                                objCurrentFieldOrContentControl.Select
+                        'Mendeley Reference Manager 2.x is installed
+                        Case 2
+                                'selects the current content control (Mendeley's bibliography content control)
+                                objCurrentFieldOrContentControl.range.Select
+                    End Select
 
                     'checks that the string can be compared
                     If (objRegExpBiblioEntries.Test(Selection) = True) Then
@@ -184,8 +962,17 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             'or more than 7 authors (APA 6th edition) due to the fact that APA replaces some of them with ellipsis (...)
                             strSubStringOfTempMatch = Left(strTempMatch, 256)
 
-                            'selects the current field (Mendeley's bibliography field)
-                            sectionField.Select
+                            'according to the version of Mendeley
+                            Select Case intAvailableMendeleyVersion
+                                'Mendeley Desktop 1.x is installed
+                                Case 1
+                                        'selects the current field (Mendeley's bibliography field)
+                                        objCurrentFieldOrContentControl.Select
+                                'Mendeley Reference Manager 2.x is installed
+                                Case 2
+                                        'selects the current content control (Mendeley's bibliography content control)
+                                        objCurrentFieldOrContentControl.range.Select
+                            End Select
 
                             'finds and selects the text of the current reference
                             blnReferenceEntryFound = False
@@ -222,6 +1009,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
                         Next 'treats all matches (all entries in bibliography) to generate bookmars
                     End If
+
                     'by now, we have created all bookmarks and have all entries in colMatchesBiblioEntries
                     'for future use when creating the hyperlinks
 
@@ -231,35 +1019,53 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         'generates the hyperlnks from the list of non detected URLs
                         'the non detected URLs shall be done first or some conflicts may arise
                         For Each varNonDetectedURL In arrNonDetectedURLs
-                                'selects the current field (Mendeley's bibliography field)
-                                sectionField.Select
+                            'according to the version of Mendeley
+                            Select Case intAvailableMendeleyVersion
+                                'Mendeley Desktop 1.x is installed
+                                Case 1
+                                        'selects the current field (Mendeley's bibliography field)
+                                        objCurrentFieldOrContentControl.Select
+                                'Mendeley Reference Manager 2.x is installed
+                                Case 2
+                                        'selects the current content control (Mendeley's bibliography content control)
+                                        objCurrentFieldOrContentControl.range.Select
+                            End Select
 
-                                'finds all instances of current URL
-                                Do
-                                    'finds and selects the text of the URL
-                                    With Selection.Find
-                                        .Forward = True
-                                        .Wrap = wdFindStop
-                                        .Text = CStr(varNonDetectedURL)
-                                        .Execute
-                                        blnURLFound = .found
-                                    End With
+                            'finds all instances of current URL
+                            Do
+                                'finds and selects the text of the URL
+                                With Selection.Find
+                                    .Forward = True
+                                    .Wrap = wdFindStop
+                                    .Text = CStr(varNonDetectedURL)
+                                    .Execute
+                                    blnURLFound = .found
+                                End With
 
-                                    'creates the hyperlink
-                                    If blnURLFound Then
-                                        'checks there is no hyperlink already
-                                        If Selection.Hyperlinks.Count = 0 Then
-                                            Selection.Hyperlinks.Add Anchor:=Selection.range, _
-                                                Address:=Replace(Trim(CStr(varNonDetectedURL)), " ", "%20"), SubAddress:="", _
-                                                ScreenTip:=""
-                                        End If
+                                'creates the hyperlink
+                                If blnURLFound Then
+                                    'checks there is no hyperlink already
+                                    If Selection.Hyperlinks.Count = 0 Then
+                                        Selection.Hyperlinks.Add Anchor:=Selection.range, _
+                                            Address:=Replace(Trim(CStr(varNonDetectedURL)), " ", "%20"), SubAddress:="", _
+                                            ScreenTip:=""
                                     End If
+                                End If
 
-                                Loop Until (Not blnURLFound) 'finds all instances of current URL
+                            Loop Until (Not blnURLFound) 'finds all instances of current URL
                         Next 'generates the hyperlnks from the list of non detected URLs
 
-                        'selects the current field (Mendeley's bibliography field)
-                        sectionField.Select
+                        'according to the version of Mendeley
+                        Select Case intAvailableMendeleyVersion
+                            'Mendeley Desktop 1.x is installed
+                            Case 1
+                                    'selects the current field (Mendeley's bibliography field)
+                                    objCurrentFieldOrContentControl.Select
+                            'Mendeley Reference Manager 2.x is installed
+                            Case 2
+                                    'selects the current content control (Mendeley's bibliography content control)
+                                    objCurrentFieldOrContentControl.range.Select
+                        End Select
 
                         'checks that the string can be compared (both, Selection and Field.Code)
                         If objRegExpURL.Test(Selection) = True Then
@@ -276,8 +1082,17 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     strURL = objMatchURL.value
                                 End If
 
-                                'selects the current field (Mendeley's bibliography field)
-                                sectionField.Select
+                                'according to the version of Mendeley
+                                Select Case intAvailableMendeleyVersion
+                                    'Mendeley Desktop 1.x is installed
+                                    Case 1
+                                            'selects the current field (Mendeley's bibliography field)
+                                            objCurrentFieldOrContentControl.Select
+                                    'Mendeley Reference Manager 2.x is installed
+                                    Case 2
+                                            'selects the current content control (Mendeley's bibliography content control)
+                                            objCurrentFieldOrContentControl.range.Select
+                                End Select
 
                                 'finds all instances of current URL
                                 Do
@@ -315,7 +1130,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                     Exit For
 
                 End If 'if it is the biblio
-            Next 'checks all fields
+            Next 'checks all fields or content controls
         End If 'checks if the bibliography is in this section
 
         'if the bibliography has been found already, no need to check other sections
@@ -363,7 +1178,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     'updated to separate authors from editors:
     'objRegExpFindHiddenCitationItems.Pattern = "(\" & Chr(34) & "editor\" & Chr(34) & "\s:\s)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s\:\s\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & ")"
     'updated to also include the publication year:
-    objRegExpFindHiddenCitationItems.Pattern = "((\" & Chr(34) & "editor\" & Chr(34) & "\s*:\s*)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s*\:\s*\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & "))|(\[\s*\[\s*\" & Chr(34) & "[0-9]+\" & Chr(34) & "\s*\]\s*\])"
+    objRegExpFindHiddenCitationItems.Pattern = "((\" & Chr(34) & "editor\" & Chr(34) & "\s*:\s*)|(((\" & Chr(34) & "id\" & Chr(34) & ")|(\" & Chr(34) & "family\" & Chr(34) & "))\s*\:\s*\" & Chr(34) & "[^\" & Chr(34) & "]*\" & Chr(34) & "))|(\[\s*\[\s*\" & Chr(34) & "[0-9]+\" & Chr(34) & "\s*\]\s*\])|(\[\s*\[\s*\" & Chr(34) & "[0-9]+\" & Chr(34) & "\s*,\s*\" & Chr(34) & "[0-9]+\" & Chr(34) & "\s*\]\s*\])"
     'sets case insensitivity
     objRegExpVisibleCitationItems.IgnoreCase = False
     objRegExpFindHiddenCitationItems.IgnoreCase = False
@@ -374,24 +1189,86 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     objRegExpFindHiddenCitationItems.Global = True
     objRegExpFindBiblioEntry.Global = True
     objRegExpFindVisibleCitationItem.Global = True
+    strOrphanCitationItems = ""
 
+    
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
-        'checks all fields
-        For Each sectionField In documentSection.range.Fields
+        
+        'according to the version of Mendeley
+        Select Case intAvailableMendeleyVersion
+            'Mendeley Desktop 1.x is installed
+            Case 1
+                    'counts the number of fields in this section (needed to iterate over all of them)
+                    'intTotalNumberOfFieldsOrContentControls = documentSection.range.Fields.Count
+                    Set varFieldsOrContentControls = documentSection.range.Fields
+            'Mendeley Reference Manager 2.x is installed
+            Case 2
+                    'counts the number of content controls in this section (needed to iterate over all of them)
+                    'intTotalNumberOfFieldsOrContentControls = documentSection.range.ContentControls.Count
+                    Set varFieldsOrContentControls = documentSection.range.ContentControls
+        End Select
+
+        'checks all fields or content controls
+        For Each objCurrentFieldOrContentControl In varFieldsOrContentControls
+        'For intIndexCurrentFieldOrContentControl = 1 To intTotalNumberOfFieldsOrContentControls
+
+            'according to the version of Mendeley
+            Select Case intAvailableMendeleyVersion
+                'Mendeley Desktop 1.x is installed
+                Case 1
+                        'gets the current field in this document section
+                        'Set objCurrentFieldOrContentControl = documentSection.range.Fields(intIndexCurrentFieldOrContentControl)
+                        'checks if it is a citation
+                        If objCurrentFieldOrContentControl.Type = wdFieldAddin And Left(objCurrentFieldOrContentControl.Code, 18) = "ADDIN CSL_CITATION" Then
+                            blnCitationFound = True
+                        Else
+                            blnCitationFound = False
+                        End If
+                'Mendeley Reference Manager 2.x is installed
+                Case 2
+                        'gets the current content control in this document section
+                        'Set objCurrentFieldOrContentControl = documentSection.range.ContentControls(intIndexCurrentFieldOrContentControl)
+                        'checks if it is a citation
+                        If objCurrentFieldOrContentControl.Type = wdContentControlRichText And Left(Trim(objCurrentFieldOrContentControl.Tag), 21) = "MENDELEY_CITATION_v3_" Then
+                            blnCitationFound = True
+                        Else
+                            blnCitationFound = False
+                        End If
+            End Select
+
             'if it is a citation
-            If sectionField.Type = wdFieldAddin And Left(sectionField.Code, 18) = "ADDIN CSL_CITATION" Then
+            If blnCitationFound Then
 
-                'selects the current field (Mendeley's citation field)
-                sectionField.Select
+                'according to the version of Mendeley
+                Select Case intAvailableMendeleyVersion
+                    'Mendeley Desktop 1.x is installed
+                    Case 1
+                            'selects the current field (Mendeley's citation field)
+                            objCurrentFieldOrContentControl.Select
+                            'gets the full information of the current citation (which contains all individual citations in the field or content control object with the full list of authors)
+                            strCitationFullInfo = GAUG_getCitationFullInfo(intAvailableMendeleyVersion, strAllCitationsFullInformation, objCurrentFieldOrContentControl, Nothing)
+                            'gets the list of all items (individual citations within the field or content control) from the citation full information
+                            varCitationItemsFromCitationFullInfo = GAUG_getCitationItemsFromCitationFullInfo(intAvailableMendeleyVersion, strCitationFullInfo)
+                    
+                    'Mendeley Reference Manager 2.x is installed
+                    Case 2
+                            'selects the current content control (Mendeley's citation content control)
+                            objCurrentFieldOrContentControl.range.Select
+                            'gets the full information of the current citation (which contains all individual citations in the field or content control object with the full list of authors)
+                            strCitationFullInfo = GAUG_getCitationFullInfo(intAvailableMendeleyVersion, strAllCitationsFullInformation, Nothing, objCurrentFieldOrContentControl)
+                            'gets the list of all items (individual citations within the field or content control) from the citation full information
+                            varCitationItemsFromCitationFullInfo = GAUG_getCitationItemsFromCitationFullInfo(intAvailableMendeleyVersion, strCitationFullInfo)
+                End Select
 
-                'checks that the string can be compared (both, Selection and Field.Code)
-                If (objRegExpVisibleCitationItems.Test(Selection) = True) And (objRegExpFindHiddenCitationItems.Test(sectionField.Code) = True) Then
+
+                'checks that the string can be compared (both, Selection and the string with the full information of the citation)
+                If (objRegExpVisibleCitationItems.Test(Selection) = True) And (objRegExpFindHiddenCitationItems.Test(strCitationFullInfo) = True) Then
                     'gets the matches (all entries in the citation according to the regular expression)
                     Set colMatchesVisibleCitationItems = objRegExpVisibleCitationItems.Execute(Selection)
-                    'gets the matches (all entries in the citation .Data according to the regular expression)
+                    'gets the matches (all entries in the full information of the citation according to the regular expression)
                     '(used to find the entry in the bibliography)
-                    Set colMatchesFindHiddenCitationItems = objRegExpFindHiddenCitationItems.Execute(sectionField.Code)
+                    Set colMatchesFindHiddenCitationItems = objRegExpFindHiddenCitationItems.Execute(strCitationFullInfo)
 
                     'treats all matches (all entries in citation) to generate hyperlinks
                     For Each objMatchVisibleCitationItem In colMatchesVisibleCitationItems
@@ -399,128 +1276,136 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         'IN ORDER TO CREATE THE LINK:
                         'Start: Needs re-work
 
+                        'gets the list of all parts (author, year, and letter of year if present) from the visible citation item (entry in visible text of citation)
+                        'position 1 is the author (when present)
+                        'position 2 is the issue year
+                        'position 3 is the letter after the issue year (when present)
+                        varPartsFromVisibleCitationItem = GAUG_getPartsFromVisibleCitationItem(objMatchVisibleCitationItem.value)
+
+
                         'when citations are merged, they are ordered by the authors' family names
                         'the position of the citation in the visible text may not correspond to the position in the citation hidden data,
                         'we need to find the entry, but we may not have the authors's family names :(
 
+
                         'if the current match has authors's family names (not only the year)
-                        'we keep them stored for future use if needed
-                        If Len(Trim(objMatchVisibleCitationItem.value)) > 6 Then 'includes ", " before the year
-                            strLastAuthors = objMatchVisibleCitationItem.value
-                            'removes the last character that could be a letter, the next loop will finish removing the year
-                            strLastAuthors = Left(strLastAuthors, Len(strLastAuthors) - 1)
+                        'we keep them stored for future use if next citation item DOES NOT include them
+                        If Len(varPartsFromVisibleCitationItem(1)) > 0 Then
+                            strLastAuthors = varPartsFromVisibleCitationItem(1)
                         End If
-                        'removes the years to leave only the authors's family names
-                        Do While IsNumeric(Right(strLastAuthors, 1)) Or (Right(strLastAuthors, 1) = ",") Or (Right(strLastAuthors, 1) = " ")
-                            strLastAuthors = Left(strLastAuthors, Len(strLastAuthors) - 1)
-                        Loop
-                        strLastAuthors = Trim(strLastAuthors) '"et al." may still be in the string, but we need it that way
+
+                        'checks if the list of all items from the citation full information is not empty (see https://riptutorial.com/excel-vba/example/30824/check-if-array-is-initialized--if-it-contains-elements-or-not--)
+                        If Not Not varCitationItemsFromCitationFullInfo Then
+                            'treats all citation items from the citation full information (to find which one corresponds to the current visible citation item being treated)
+                            For intCitationItemFromCitationFullInfo = 1 To UBound(varCitationItemsFromCitationFullInfo)
+                                'gets the list of authors (if available) from the citation item
+                                varAuthorsFomCitationItem = GAUG_getAuthorsEditorsFromCitationItem(intAvailableMendeleyVersion, "author", varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
+                                'gets the list of editors (if available) from the citation item
+                                varEditorsFomCitationItem = GAUG_getAuthorsEditorsFromCitationItem(intAvailableMendeleyVersion, "editor", varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
+                                'gets the year of issue from the citation item
+                                varYearFomCitationItem = GAUG_getYearFromCitationItem(intAvailableMendeleyVersion, varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
 
 
-                        'iterates to find all ("id" : "ITEM-X") in colMatchesFindHiddenCitationItems to identify where the citation is located
-                        For intCitationEntryPosition = 1 To colMatchesVisibleCitationItems.Count
+                                'initializes the regular expressions
+                                objRegExpFindBiblioEntry.Pattern = ""
+                                objRegExpFindVisibleCitationItem.Pattern = ""
 
-                            'flag to find the position of the current citation entry
-                            blnCitationEntryPositionFound = False
 
-                            'flag to skip the name of the editors
-                            blnEditorsFound = False
-
-                            'initializes the regular expressions
-                            objRegExpFindBiblioEntry.Pattern = ""
-                            objRegExpFindVisibleCitationItem.Pattern = ""
-
-                            'gets the data from current citation entry to build the pattern to find the reference entry in biblio
-                            For Each objMatchsFindHiddenCitationItem In colMatchesFindHiddenCitationItems
-                                'activates the flag only if in current citation entry
-                                'if the current citation entry starts/ends here ("id" : "ITEM-X")
-                                If objMatchsFindHiddenCitationItem.value = Chr(34) & "id" & Chr(34) & " : " & Chr(34) & "ITEM-" & CStr(intCitationEntryPosition) & Chr(34) Then
-                                    blnCitationEntryPositionFound = Not blnCitationEntryPositionFound
-                                Else
-                                    If blnCitationEntryPositionFound Then
-                                        'if the "editor" names start here, sets the flag to stop adding them
-                                        If objMatchsFindHiddenCitationItem.value = Chr(34) & "editor" & Chr(34) & " : " Then
-                                            'but if no authors were found (like with a book with only editors), then the flag is not set because the editors are used for the citation
-                                            If Len(objRegExpFindVisibleCitationItem.Pattern) > 0 Then
-                                                blnEditorsFound = True
-                                            End If
-                                        Else
-                                            'skips the year related to "accessed" that may be between start/end of current ("id" : "ITEM-X")
-                                            If Not (Left(objMatchsFindHiddenCitationItem.value, 5) = "[ [ " & Chr(34) And Right(objMatchsFindHiddenCitationItem.value, 5) = Chr(34) & " ] ]") Then
-                                                'if the names are the author's names
-                                                If Not blnEditorsFound Then
-                                                    'gets the last name of the author and adds it to the regular expression
-                                                    objRegExpFindBiblioEntry.Pattern = objRegExpFindBiblioEntry.Pattern & Replace(Mid(objMatchsFindHiddenCitationItem.value, InStr(objMatchsFindHiddenCitationItem.value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
-                                                    'creates another patterns to match the citation entry with the citation data, they are not in the same position as thought
-                                                    objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & Replace(Mid(objMatchsFindHiddenCitationItem.value, InStr(objMatchsFindHiddenCitationItem.value, Chr(34) & " : " & Chr(34)) + 5), Chr(34), "") & ".*"
-                                                    'if this is the first author, this could be the only one listed, and the rest as "et al."
-                                                    If Not blnAuthorsFound Then
-                                                        'includes the part to check for "et al."
-                                                        objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "((et al\..*)|("
-                                                    End If
-                                                    'authors were found, we can start searching for the year of publication
-                                                    blnAuthorsFound = True
-                                                End If
-                                            End If
+                                'if the citation item has authors (instead of editors)
+                                If Not Not varAuthorsFomCitationItem Then
+                                    For intAuthorFromCitationItem = 1 To UBound(varAuthorsFomCitationItem)
+                                        'gets the last name of the author and adds it to the regular expression (used to find the entry in the bibliography)
+                                        objRegExpFindBiblioEntry.Pattern = objRegExpFindBiblioEntry.Pattern & varAuthorsFomCitationItem(intAuthorFromCitationItem) & ".*"
+                                        'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
+                                        objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & varAuthorsFomCitationItem(intAuthorFromCitationItem) & ".*"
+                                        'if this is the first authorof many, this could be the only one listed, and the rest as "et al."
+                                        If intAuthorFromCitationItem = 1 And UBound(varAuthorsFomCitationItem) > 1 Then
+                                            'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
+                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "((et al\..*)|("
                                         End If
-                                    Else
-                                        'gets the year of the publication, it is after the entry ends in ("id" : "ITEM-X")
-                                        If blnAuthorsFound And Left(objMatchsFindHiddenCitationItem.value, 5) = "[ [ " & Chr(34) And Right(objMatchsFindHiddenCitationItem.value, 5) = Chr(34) & " ] ]" Then
-                                            strLastYear = Mid(objMatchsFindHiddenCitationItem.value, 6, Len(objMatchsFindHiddenCitationItem.value) - 10)
-                                            'finishes the pattern including the year and checking if there are more than one author
-                                            'if only one author, then removes "et al." from the pattern
-                                            If Right(objRegExpFindVisibleCitationItem.Pattern, 2) = "|(" Then
-                                                objRegExpFindVisibleCitationItem.Pattern = Left(objRegExpFindVisibleCitationItem.Pattern, Len(objRegExpFindVisibleCitationItem.Pattern) - 14)
-                                                objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & strLastYear
-                                            Else
-                                                objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "))" & strLastYear
+                                    Next
+                                    'closes the parenthesis in the pattern if more than one author
+                                    If UBound(varAuthorsFomCitationItem) > 1 Then
+                                        objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "))"
+                                    End If
+
+                                'but if no authors were found (like with a book with only editors), we use editors instead
+                                Else
+                                    'if the citation item has editors
+                                    If Not Not varEditorsFomCitationItem Then
+                                        For intEditorFromCitationItem = 1 To UBound(varEditorsFomCitationItem)
+                                            'gets the last name of the editor and adds it to the regular expression (used to find the entry in the bibliography)
+                                            objRegExpFindBiblioEntry.Pattern = objRegExpFindBiblioEntry.Pattern & varEditorsFomCitationItem(intEditorFromCitationItem) & ".*"
+                                            'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
+                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & varEditorsFomCitationItem(intEditorFromCitationItem) & ".*"
+                                            'if this is the first editor of many, this could be the only one listed, and the rest as "et al."
+                                            If intEditorFromCitationItem = 1 And UBound(varEditorsFomCitationItem) > 1 Then
+                                                'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
+                                                objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "((et al\..*)|("
                                             End If
-                                            blnAuthorsFound = False
+                                        Next
+                                        'closes the parenthesis in the pattern if more than one editor
+                                        If UBound(varEditorsFomCitationItem) > 1 Then
+                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "))"
                                         End If
                                     End If
                                 End If
 
-                            Next 'gets the data from current citation entry to build the pattern to find the reference entry in biblio
-
-                            'gets the matches, if any, to check if this reference entry corresponds to the citation being treated
-                            If Len(Trim(objMatchVisibleCitationItem.value)) > 6 Then 'includes ", " before the year
-                                Set colMatchesFindVisibleCitationItem = objRegExpFindVisibleCitationItem.Execute(objMatchVisibleCitationItem.value)
-                            Else
-                                Set colMatchesFindVisibleCitationItem = objRegExpFindVisibleCitationItem.Execute(strLastAuthors & ", " & objMatchVisibleCitationItem.value)
-                            End If
-                            'if this is the corresponding reference entry
-                            If colMatchesFindVisibleCitationItem.Count > 0 Then
-                                'MsgBox ("Match between DOCUMENT and DATA found:" & vbCrLf & vbCrLf & colMatchesFindVisibleCitationItem.Item(0).value)
-                                Exit For
-                            End If
-
-                        Next 'iterates to find all ("id" : "ITEM-X") in colMatchesFindHiddenCitationItems to identify where the citation is located
+                                'finishes the patterns including the year and the letter shown in the visible citation item
+                                objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & varYearFomCitationItem & varPartsFromVisibleCitationItem(3)
+                                objRegExpFindBiblioEntry.Pattern = objRegExpFindBiblioEntry.Pattern & "\(" & varYearFomCitationItem & varPartsFromVisibleCitationItem(3) & "\)"
+                                'MsgBox objMatchVisibleCitationItem.value & " -> *" & _
+                                '    varPartsFromVisibleCitationItem(1) & "*" & varPartsFromVisibleCitationItem(2) & "*" & varPartsFromVisibleCitationItem(3) & "*" & vbCrLf & vbCrLf & _
+                                '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & vbCrLf & _
+                                '    objRegExpFindBiblioEntry.Pattern
 
 
-                        'adds the year of current citation entry
-                        'we include the year from objMatchVisibleCitationItem (the visible text in the document) because
-                        'it may also include a letter in the end (e.g. "2017a") and we need that letter
-                        If Mid(objMatchVisibleCitationItem.value, Len(objMatchVisibleCitationItem.value) - 4, 1) = " " Then
-                            objRegExpFindBiblioEntry.Pattern = objRegExpFindBiblioEntry.Pattern & "\(" & Right(objMatchVisibleCitationItem.value, 4) & "\)"
-                        Else
-                            objRegExpFindBiblioEntry.Pattern = objRegExpFindBiblioEntry.Pattern & "\(" & Right(objMatchVisibleCitationItem.value, 5) & "\)"
-                        End If
+                                'if the current visible citation item has authors's family names (not only the year)
+                                If Len(varPartsFromVisibleCitationItem(1)) > 0 Then
+                                    'checks if this item from the citation full information corresponds to the visible citation item being treated
+                                    Set colMatchesFindVisibleCitationItem = objRegExpFindVisibleCitationItem.Execute(objMatchVisibleCitationItem.value)
+                                Else
+                                    'checks if this item from the citation full information corresponds to the visible citation item being treated
+                                    Set colMatchesFindVisibleCitationItem = objRegExpFindVisibleCitationItem.Execute(strLastAuthors & ", " & objMatchVisibleCitationItem.value)
+                                End If
+                                
+                                'if this item from the citation full information corresponds to the visible citation item being treated
+                                If colMatchesFindVisibleCitationItem.Count > 0 Then
+                                    'MsgBox ("Match between DOCUMENT (visible citation item) and DATA (hidden citation item) found:" & vbCrLf & vbCrLf & _
+                                    '    colMatchesFindVisibleCitationItem.Item(0).value)
+                                    Exit For
+                                End If
 
-                        'last verification to make sure we found the citation and not because the for loop reached the end
+                            Next 'treats all citation items from the citation full information
+                        End If 'checks if the list of all items from the citation full information is not empty
+
+
+
+                        'last verification to make sure we are here because this item from the citation full information corresponds
+                        'to the visible citation item being treated and not because the for loop reached the end
                         If colMatchesFindVisibleCitationItem.Count = 0 Then
-                            'cleans the regular expression as no entries were found
+                            'cleans the regular expression as no matches were found
                             objRegExpFindBiblioEntry.Pattern = "Error: Citation not found"
                         End If
 
-                        'at this point, the regular expression to find the entry in the biblio is ready
+                        'at this point, the regular expression to find the entry in the bibliography is ready
+                        'MsgBox "The visible citation item" & vbCrLf & _
+                        '    objMatchVisibleCitationItem.value & vbCrLf & _
+                        '    "matches:" & vbCrLf & vbCrLf & _
+                        '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & _
+                        '    objRegExpFindBiblioEntry.Pattern
+
+
+                        'it is time to find the citation entry in the bibliography and link the current visible citation item
+
 
                         'initializes the position
                         i = 1
-                        'finds the position of the citation entry in the list of references in the biblio
+                        'finds the position of the citation entry in the list of references in the bibliography
                         blnReferenceEntryFound = False
                         For Each objMatchBiblioEntry In colMatchesBiblioEntries
                             'MsgBox ("Searching for citation in bibliography:" & vbCrLf & vbCrLf & "Using..." & vbCrLf & objRegExpFindBiblioEntry.Pattern & vbCrLf & objMatchBiblioEntry.value)
-                            'gets the matches, if any, to check if this reference entry corresponds to the citation being treated
+                            'gets the matches, if any, to check if this reference entry corresponds to the visible citation item being treated
                             Set colMatchesFindBiblioEntry = objRegExpFindBiblioEntry.Execute(objMatchBiblioEntry.value)
                             'if the this is the corresponding reference entry
                             'Verify for MabEntwickeltSich: perhaps a more strict verification is needed
@@ -533,12 +1418,22 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         Next
 
                         'at this point we also have the position (i) in the biblio, we are ready to create the hyperlink
+                        'the position is isued to link to the bookmark 'GAUG_SignetBibliographie_<position>'
 
                         'if reference entry was found (shall always find it), creates the hyperlink
                         If blnReferenceEntryFound Then
                             'MsgBox ("Citation was found in the bibliography" & vbCrLf & vbCrLf & colMatchesFindBiblioEntry.Item(0).value)
-                            'selects the current field (Mendeley's citation field)
-                            sectionField.Select
+                            'according to the version of Mendeley
+                            Select Case intAvailableMendeleyVersion
+                                'Mendeley Desktop 1.x is installed
+                                Case 1
+                                        'selects the current field (Mendeley's citation field)
+                                        objCurrentFieldOrContentControl.Select
+                                'Mendeley Reference Manager 2.x is installed
+                                Case 2
+                                        'selects the current content control (Mendeley's citation content control)
+                                        objCurrentFieldOrContentControl.range.Select
+                            End Select
 
                             'finds the opening parenthesis (first character of the field),
                             'used to select something inside the field
@@ -577,11 +1472,8 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
                             End If
                         Else
-                            MsgBox "Orphan citation entry found:" & vbCrLf & vbCrLf & _
-                                objMatchVisibleCitationItem.value & vbCrLf & vbCrLf & _
-                                "Remove it from document!", _
-                                vbExclamation, "GAUG_createHyperlinksForCitationsAPA()"
-                            'MsgBox ("Orphan citation entry found:" & vbCrLf & vbCrLf & objMatchVisibleCitationItem.value & vbCrLf & vbCrLf & "Remove it from document!" & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Regular expression to find reference in bibliography (from DATA and year from DOCUMENT):" & vbCrLf & vbCrLf & objRegExpFindBiblioEntry.Pattern & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Last authors (from DOCUMENT):" & vbCrLf & vbCrLf & strLastAuthors & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Year of publication (from DATA):" & vbCrLf & vbCrLf & strLastYear & vbCrLf & vbCrLf & vbCrLf & vbCrLf & "Pattern to find matching between DOCUMENT and DATA (DATA):" & vbCrLf & vbCrLf & objRegExpFindVisibleCitationItem.Pattern)
+                            'if the visible citation item could not be linked to an entry in the bibliography
+                            strOrphanCitationItems = strOrphanCitationItems & Trim(objMatchVisibleCitationItem.value) & vbCrLf
                         End If
 
                         'Ends: Needs re-work
@@ -593,12 +1485,23 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                 End If 'checks that the string can be compared
 
             End If 'if it is a citation
-        Next 'sectionField
+        Next 'checks all fields or content controls
 
         'at this point all citations are linked to their corresponding reference in biblio
 
     Next 'documentSection
 
+    'if orphan citations exist
+    If Len(strOrphanCitationItems) > 0 Then
+        MsgBox "Orphan citation entries found:" & vbCrLf & vbCrLf & _
+            strOrphanCitationItems & vbCrLf & _
+            "Remove them from document!", _
+            vbExclamation, "GAUG_createHyperlinksForCitationsAPA()"
+    End If
+
+    'returns to original position in the document
+    currentPosition.Select
+    
     'reenables the screen updating
     Application.ScreenUpdating = True
 
@@ -1059,8 +1962,9 @@ End Sub
 '*****************************************************************************************
 Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As String = "RemoveHyperlinks")
 
+    Dim intAvailableMendeleyVersion, intUseMendeleyVersion As Integer
     Dim documentSection As Section
-    Dim sectionField As Field
+    Dim objCurrentFieldOrContentControl As Object
     Dim fieldBookmark As Bookmark
     Dim selectionHyperlinks As Hyperlinks
     Dim i As Integer
@@ -1072,12 +1976,20 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
     Dim stlStyleInDocument As Word.Style
     Dim strStyleForTitleOfBibliography As String
     Dim blnStyleForTitleOfBibliographyFound As Boolean
+    Dim varFieldsOrContentControls As Variant
     Dim currentPosition As range
 
 
 '*****************************
 '*   Custom configuration    *
 '*****************************
+    'possible values are 0, 1 or 2
+    'SEE DOCUMENTATION
+    'set to 0 if the macros should automatically detect the version of Mendeley
+    'set to 1 if the macros should use Mendeley Desktop 1.x (with the MS Word plugin Mendeley Cite-O-Matic)
+    'set to 2 if the macros should use Mendeley Reference Manager 2.x (with the App Mendeley Cite)
+    intUseMendeleyVersion = 0
+
     'SEE DOCUMENTATION
     'specifies the name of the font style used for the title of the bibliography
     strStyleForTitleOfBibliography = "Titre de dernière section"
@@ -1119,15 +2031,35 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
         End
     End If
 
+    'gets the version of Mendeley (autodetect or specified)
+    intAvailableMendeleyVersion = GAUG_getAvailableMendeleyVersion(intUseMendeleyVersion)
 
     'selects the type of execution
     Select Case strTypeOfExecution
         Case "RemoveHyperlinks"
             'nothing to do here
         Case "CleanEnvironment"
+            'only available when Mendeley Desktop 1.x is used
+            If Not intAvailableMendeleyVersion = 1 Then
+                MsgBox "Incompatible execution type " & Chr(34) & strTypeOfExecution & Chr(34) & " for GAUG_removeHyperlinksForCitations(strTypeOfExecution)." & vbCrLf & vbCrLf & _
+                    "Only " & Chr(34) & "RemoveHyperlinks" & Chr(34) & " can be used with Mendeley Reference Manager 2.x (with the App Mendeley Cite)." & vbCrLf & vbCrLf & _
+                    "Cannot continue creating hyperlinks.", _
+                    vbCritical, "GAUG_removeHyperlinksForCitations(strTypeOfExecution)"
+                'the execution option is not correct
+                End
+            End If
             'get the API Client from Mendeley
             Set objMendeleyApiClient = Application.Run("Mendeley.mendeleyApiClient") 'MabEntwickeltSich: This is the way to call the macro directly from Mendeley
         Case "CleanFullEnvironment"
+            'only available when Mendeley Desktop 1.x is used
+            If Not intAvailableMendeleyVersion = 1 Then
+                MsgBox "Incompatible execution type " & Chr(34) & strTypeOfExecution & Chr(34) & " for GAUG_removeHyperlinksForCitations(strTypeOfExecution)." & vbCrLf & vbCrLf & _
+                    "Only " & Chr(34) & "RemoveHyperlinks" & Chr(34) & " can be used with Mendeley Reference Manager 2.x (with the App Mendeley Cite)." & vbCrLf & vbCrLf & _
+                    "Cannot continue creating hyperlinks.", _
+                    vbCritical, "GAUG_removeHyperlinksForCitations(strTypeOfExecution)"
+                'the execution option is not correct
+                End
+            End If
             'gets the Undo Edit Button
             Set cbbUndoEditButton = Application.Run("MendeleyLib.getUndoEditButton") 'MabEntwickeltSich: This is the way to call the macro directly from Mendeley
         Case Else
@@ -1158,11 +2090,55 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
 '*****************************
     'checks all sections
     For Each documentSection In ActiveDocument.Sections
-        'checks all fields
-        For Each sectionField In documentSection.range.Fields
+
+        'according to the version of Mendeley
+        Select Case intAvailableMendeleyVersion
+            'Mendeley Desktop 1.x is installed
+            Case 1
+                    'gets the list of fields in this section
+                    Set varFieldsOrContentControls = documentSection.range.Fields
+            'Mendeley Reference Manager 2.x is installed
+            Case 2
+                    'gets the list of content controls in this section
+                    Set varFieldsOrContentControls = documentSection.range.ContentControls
+        End Select
+
+        'checks all fields or content controls
+        For Each objCurrentFieldOrContentControl In varFieldsOrContentControls
+            'initializes the flag
+            blnCitationFound = False
+
+            'according to the version of Mendeley
+            Select Case intAvailableMendeleyVersion
+                'Mendeley Desktop 1.x is installed
+                Case 1
+                        'checks if it is a citation
+                        If objCurrentFieldOrContentControl.Type = wdFieldAddin And Left(objCurrentFieldOrContentControl.Code, 18) = "ADDIN CSL_CITATION" Then
+                            blnCitationFound = True
+                        End If
+                'Mendeley Reference Manager 2.x is installed
+                Case 2
+                        'checks if it is a citation
+                        If objCurrentFieldOrContentControl.Type = wdContentControlRichText And Left(Trim(objCurrentFieldOrContentControl.Tag), 21) = "MENDELEY_CITATION_v3_" Then
+                            blnCitationFound = True
+                        End If
+            End Select
+
             'if it is a citation
-            If sectionField.Type = wdFieldAddin And Left(sectionField.Code, 18) = "ADDIN CSL_CITATION" Then
-                sectionField.Select
+            If blnCitationFound Then
+
+                'according to the version of Mendeley
+                Select Case intAvailableMendeleyVersion
+                    'Mendeley Desktop 1.x is installed
+                    Case 1
+                            'selects the current field (Mendeley's citation field)
+                            objCurrentFieldOrContentControl.Select
+                    'Mendeley Reference Manager 2.x is installed
+                    Case 2
+                            'selects the current content control (Mendeley's citation content control)
+                            objCurrentFieldOrContentControl.range.Select
+                End Select
+
 
                 'selects the type of execution to remove hyperlinks
                 Select Case strTypeOfExecution
@@ -1198,10 +2174,10 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
                     Case "CleanEnvironment"
                         'copied from Mendeley.undoEdit(), but removing the code that updates the toolbar in Microsoft Word (making the original function very slow)
                         'restores the citations to the original state (deletes hyperlinks)
-                        sectionFieldName = Application.Run("ZoteroLib.getMarkName", sectionField)
+                        sectionFieldName = Application.Run("ZoteroLib.getMarkName", objCurrentFieldOrContentControl)
                         sectionFieldNewName = objMendeleyApiClient.undoManualFormat(sectionFieldName)
-                        Call Application.Run("ZoteroLib.fnRenameMark", sectionField, sectionFieldNewName) 'MabEntwickeltSich: This is another way to call the macro directly from Mendeley
-                        Call Application.Run("ZoteroLib.subSetMarkText", sectionField, INSERT_CITATION_TEXT) 'MabEntwickeltSich: This is another way to call the macro directly from Mendeley
+                        Call Application.Run("ZoteroLib.fnRenameMark", objCurrentFieldOrContentControl, sectionFieldNewName) 'MabEntwickeltSich: This is another way to call the macro directly from Mendeley
+                        Call Application.Run("ZoteroLib.subSetMarkText", objCurrentFieldOrContentControl, INSERT_CITATION_TEXT) 'MabEntwickeltSich: This is another way to call the macro directly from Mendeley
                     Case "CleanFullEnvironment"
                         'restores the citations to the original state (deletes hyperlinks)
                         'slow version
@@ -1209,7 +2185,7 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
                     End Select
 
             End If 'if it is a citation
-        Next 'checks all fields
+        Next objCurrentFieldOrContentControl 'checks all fields or content controls
 
     Next 'checks all sections
 
@@ -1243,19 +2219,70 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
 
         'checks if the bibliography is in this section
         If blnFound Then
-            'checks all fields
-            For Each sectionField In documentSection.range.Fields
+            'according to the version of Mendeley
+            Select Case intAvailableMendeleyVersion
+                'Mendeley Desktop 1.x is installed
+                Case 1
+                        'gets the list of fields in this section
+                        Set varFieldsOrContentControls = documentSection.range.Fields
+                'Mendeley Reference Manager 2.x is installed
+                Case 2
+                        'gets the list of content controls in this section
+                        Set varFieldsOrContentControls = documentSection.range.ContentControls
+            End Select
+
+            'checks all fields or content controls
+            For Each objCurrentFieldOrContentControl In varFieldsOrContentControls
+
+                'according to the version of Mendeley
+                Select Case intAvailableMendeleyVersion
+                    'Mendeley Desktop 1.x is installed
+                    Case 1
+                            'checks if it is the bibliography
+                            If objCurrentFieldOrContentControl.Type = wdFieldAddin And Trim(objCurrentFieldOrContentControl.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
+                                blnBibliographyFound = True
+                            End If
+                    'Mendeley Reference Manager 2.x is installed
+                    Case 2
+                            'checks if it is the bibliograpy
+                            If objCurrentFieldOrContentControl.Type = wdContentControlRichText And Trim(objCurrentFieldOrContentControl.Tag) = "MENDELEY_BIBLIOGRAPHY" Then
+                                blnBibliographyFound = True
+                            End If
+                End Select
+
+
                 'if it is the bibliography
-                If sectionField.Type = wdFieldAddin And Trim(sectionField.Code) = "ADDIN Mendeley Bibliography CSL_BIBLIOGRAPHY" Then
-                    blnBibliographyFound = True
-                    sectionField.Select
+                If blnBibliographyFound Then
+                    'according to the version of Mendeley
+                    Select Case intAvailableMendeleyVersion
+                        'Mendeley Desktop 1.x is installed
+                        Case 1
+                                'selects the current field (Mendeley's bibliography field)
+                                objCurrentFieldOrContentControl.Select
+                        'Mendeley Reference Manager 2.x is installed
+                        Case 2
+                                'selects the current content control (Mendeley's bibliography content control)
+                                objCurrentFieldOrContentControl.range.Select
+                    End Select
+
                     'deletes all bookmarks
                     For Each fieldBookmark In Selection.Bookmarks
                         'deletes current bookmark
                         fieldBookmark.Delete
                     Next
 
-                    sectionField.Select
+                    'according to the version of Mendeley
+                    Select Case intAvailableMendeleyVersion
+                        'Mendeley Desktop 1.x is installed
+                        Case 1
+                                'selects the current field (Mendeley's bibliography field)
+                                objCurrentFieldOrContentControl.Select
+                        'Mendeley Reference Manager 2.x is installed
+                        Case 2
+                                'selects the current content control (Mendeley's bibliography content control)
+                                objCurrentFieldOrContentControl.range.Select
+                    End Select
+                    
                     'gets all URL hyperlinks from selection
                     Set selectionHyperlinks = Selection.Hyperlinks
                     'deletes all URL hyperlinks
@@ -1269,7 +2296,7 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
                     Exit For
 
                 End If 'if it is the bibliography
-            Next 'checks all fields
+            Next 'checks all fields or content controls
 
         End If 'checks if the bibliography is in this section
 
