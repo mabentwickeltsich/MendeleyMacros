@@ -151,6 +151,8 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 Function GAUG_getMendeleyWebExtensionXMLFileContents()
+
+    Dim adoStream As ADODB.Stream
     Dim strDocumentName As String
     Dim strDocumentPath As String
     Dim strDocumentFullName As String
@@ -167,7 +169,9 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
 
     'initializes the file system object
     Set objFileSystem = CreateObject("Scripting.FileSystemObject")
-
+    'initializes the stream (used to read the UTF-8 XML files)
+    Set adoStream = New ADODB.Stream
+    adoStream.Charset = "UTF-8"
     'initializes the string that will hold the the contents of the file 'webextension<number>.xml' that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
     strXMLFileContents = ""
 
@@ -218,9 +222,13 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
                     'checks if the file 'webextension<number>.xml' exists
                     If objFileSystem.FileExists(strWebExtensionXMLFullName) Then
                         'opens the XML file for reading
-                        Set objXMLFile = objFileSystem.OpenTextFile(strWebExtensionXMLFullName, 1)
-                        strXMLFileContents = objXMLFile.ReadAll
-                        objXMLFile.Close
+                        'Set objXMLFile = objFileSystem.OpenTextFile(strWebExtensionXMLFullName, 1)
+                        'strXMLFileContents = objXMLFile.ReadAll
+                        'objXMLFile.Close
+                        adoStream.Open
+                        adoStream.LoadFromFile strWebExtensionXMLFullName
+                        strXMLFileContents = adoStream.ReadText
+                        adoStream.Close
 
                         'if the files contains '<we:property name="MENDELEY_CITATIONS"', it is the one we are looking for
                         If InStr(1, strXMLFileContents, "<we:property name=" & Chr(34) & "MENDELEY_CITATIONS" & Chr(34), vbTextCompare) > 0 Then
@@ -692,7 +700,7 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
                     For Each objMatchAuthorFamilyNameFromCitationItem In colMatchesAuthorFamilyNamesFromCitationItem
                         'gets only the family name, without the extra characters in the match
                         'from '{"family":"FamilyName' to just "FamilyName"
-                        strFamilyName = Right(objMatchAuthorFamilyNameFromCitationItem.value, Len(objMatchAuthorFamilyNameFromCitationItem.value) - InStr(objMatchAuthorFamilyNameFromCitationItem.value, ":") - 1)
+                        strFamilyName = Right(objMatchAuthorFamilyNameFromCitationItem.value, Len(objMatchAuthorFamilyNameFromCitationItem.value) - InStr(1, objMatchAuthorFamilyNameFromCitationItem.value, ":", vbTextCompare) - 1)
                         'updates the counter to include this family name of the author
                         intTotalAuthorsEditorsFromCitationItem = intTotalAuthorsEditorsFromCitationItem + 1
                         'adds the family name of the author to the list
@@ -2442,6 +2450,17 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
                     vbCritical, "GAUG_removeHyperlinksForCitations(strTypeOfExecution)"
                 'the execution option is not correct
                 End
+            'if Mendeley Desktop 1.x is used
+            Else
+                'makes sure that the plugin is installed in Microsoft Word
+                If Not GAUG_isMendeleyCiteOMaticPluginInstalled() Then
+                    MsgBox "The MS Word plugin Mendeley Cite-O-Matic was not found." & vbCrLf & vbCrLf & _
+                        "Install the plugin via Mendeley Desktop 1.x and try again." & vbCrLf & vbCrLf & _
+                        "Cannot continue removing hyperlinks.", _
+                        vbCritical, "GAUG_removeHyperlinksForCitations(strTypeOfExecution)"
+                    'Mendeley's plugin is not installed, cannot call it to remove hyperlinks
+                    End
+                End If
             End If
             'get the API Client from Mendeley
             Set objMendeleyApiClient = Application.Run("Mendeley.mendeleyApiClient") 'MabEntwickeltSich: This is the way to call the macro directly from Mendeley
@@ -2454,6 +2473,17 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
                     vbCritical, "GAUG_removeHyperlinksForCitations(strTypeOfExecution)"
                 'the execution option is not correct
                 End
+            'if Mendeley Desktop 1.x is used
+            Else
+                'makes sure that the plugin is installed in Microsoft Word
+                If Not GAUG_isMendeleyCiteOMaticPluginInstalled() Then
+                    MsgBox "The MS Word plugin Mendeley Cite-O-Matic was not found." & vbCrLf & vbCrLf & _
+                        "Install the plugin via Mendeley Desktop 1.x and try again." & vbCrLf & vbCrLf & _
+                        "Cannot continue removing hyperlinks.", _
+                        vbCritical, "GAUG_removeHyperlinksForCitations(strTypeOfExecution)"
+                    'Mendeley's plugin is not installed, cannot call it to remove hyperlinks
+                    End
+                End If
             End If
             'gets the Undo Edit Button
             Set cbbUndoEditButton = Application.Run("MendeleyLib.getUndoEditButton") 'MabEntwickeltSich: This is the way to call the macro directly from Mendeley
