@@ -203,7 +203,7 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
         'opens the zip file (which is the .docx file)
         Set objZipAsFolder = objShell.namespace(CVar(strZipDocumentFullName))
 
-        'if the zip file could be oppened
+        'if the zip file could be opened
         If Not objZipAsFolder Is Nothing Then
             'extracts the zip file (copies the files from the zip to the temporary folder without showing progress)
             objShell.namespace(CVar(strTemporalFolder)).CopyHere objZipAsFolder.items, 4
@@ -242,7 +242,7 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
             'cleans up the temporary folder
             objFileSystem.DeleteFolder strTemporalFolder, True
 
-        End If 'if the zip file could be oppened
+        End If 'if the zip file could be opened
     End If 'checks if the document has a file path (if it is saved)
 
     'returns the contents (if any) of the file 'webextension<number>.xml' that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
