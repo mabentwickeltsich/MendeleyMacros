@@ -926,9 +926,9 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
     'if the argument is not within valid versions
     If intMendeleyVersion < 1 Or intMendeleyVersion > 2 Then
         MsgBox "The version " & intMendeleyVersion & " of Mendeley's plugin is not valid." & vbCrLf & vbCrLf & _
-        "Use version 1 or version 2 instead," & vbCrLf & vbCrLf & _
-        "Cannot continue creating hyperlinks.", _
-        vbCritical, "GAUG_createHyperlinksForURLsInBibliography(intMendeleyVersion, fldBibliography, ccBibliography, arrNonDetectedURLs)"
+            "Use version 1 or version 2 instead," & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "GAUG_createHyperlinksForURLsInBibliography(intMendeleyVersion, fldBibliography, ccBibliography, arrNonDetectedURLs)"
 
         'stops the execution
         End
@@ -1043,7 +1043,7 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
     End Select
 
     'checks that the string can be compared (both, Selection and Field.Code)
-    If objRegExpURL.Test(Selection) = True Then
+    If objRegExpURL.Test(Selection) Then
         'gets the matches (all URLs in the bibliography according to the regular expression)
         Set colMatchesURL = objRegExpURL.Execute(Selection)
 
@@ -1142,9 +1142,10 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim documentSection As Section
     Dim blnFound, blnBibliographyFound, blnCitationFound, blnReferenceEntryFound, blnCitationEntryFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
     Dim intReferenceNumber As Integer
-    Dim objRegExpBibliographyEntries, objRegExpVisibleCitationItems, objRegExpFindBibliographyEntry, objRegExpFindVisibleCitationItem, objRegExpURL As RegExp
-    Dim colMatchesBibliographyEntries, colMatchesVisibleCitationItems, colMatchesFindBibliographyEntry, colMatchesFindVisibleCitationItem, colMatchesURL As MatchCollection
-    Dim objMatchBibliographyEntry, objMatchVisibleCitationItem, objMatchFindBibliographyEntry, objMatchURL As match
+    Dim objRegExpBibliographyEntries, objRegExpBibliographyFullEntries, objRegExpVisibleCitationItems, objRegExpFindBibliographyEntry, objRegExpFindVisibleCitationItem, objRegExpURL As RegExp
+    Dim colMatchesBibliographyEntries, colMatchesBibliographyFullEntries, colMatchesVisibleCitationItems, colMatchesFindBibliographyEntry, colMatchesFindVisibleCitationItem, colMatchesURL As MatchCollection
+    Dim objMatchBibliographyEntry, objMatchBibliographyFullEntry, objMatchVisibleCitationItem, objMatchFindBibliographyEntry, objMatchURL As match
+    Dim strBookmarkInBibliography, arrStrBookmarksInBilbiography() As String
     Dim strTempMatch, strSubStringOfTempMatch, strLastAuthorsOrEditors As String
     Dim strTypeOfExecution As String
     Dim blnMabEntwickeltSich As Boolean
@@ -1268,14 +1269,19 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 '*****************************
 '*   Creation of bookmarks   *
 '*****************************
-    'creates the object for regular expressions (to get all entries in bibliography)
+    'creates the object for regular expressions (to get all full entries in bibliography)
+    Set objRegExpBibliographyFullEntries = New RegExp
+    'sets the pattern to match every reference full entry in the bibliography (from the first author until a new line is found)
+    objRegExpBibliographyFullEntries.Pattern = "((^)|(\r)).+?(?=((\r)|($)))"
+    'sets case insensitivity
+    objRegExpBibliographyFullEntries.IgnoreCase = False
+    'sets global applicability
+    objRegExpBibliographyFullEntries.Global = True
+    'creates the object for regular expressions (to get the entry's text in the bibliography to create the bookmark)
     Set objRegExpBibliographyEntries = New RegExp
-    'sets the pattern to match every reference entry in the bibliography (it may include a character of carriage return)
-    '(all text from the beginning of the string, or carriage return, until a year between parentheses is found)
-    'updated to include "(Ed.)" and "(Eds.)" when editors are used for the citations and bibliography
-    objRegExpBibliographyEntries.Pattern = "((^)|(\r))[^(\r)]*(\(Eds?\.\))?\.\s\(\d\d\d\d[a-zA-Z]?\)"
-    'NOT updated to include more "(<some text>)" in cases such as "United Nations (UN). (2024)...", this brakes the regular expression (needs a better approach)
-    'objRegExpBibliographyEntries.Pattern = "((^)|(\r))([^(\r)]*(\([a-zA-Z\s]*\))*)*(\(Eds?\.\))?\.\s\(\d\d\d\d[a-zA-Z]?\)"
+    'sets the pattern to match the reference entry
+    '(all text from the beginning of the string until a year between parentheses is found)
+    objRegExpBibliographyEntries.Pattern = "^.*\.\s\(\d\d\d\d[a-zA-Z]?\)"
     'sets case insensitivity
     objRegExpBibliographyEntries.IgnoreCase = False
     'sets global applicability
@@ -1364,68 +1370,86 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                     End Select
 
                     'checks that the string can be compared
-                    If objRegExpBibliographyEntries.Test(Selection) Then
-                        'gets the matches (all entries in bibliography according to the regular expression)
-                        Set colMatchesBibliographyEntries = objRegExpBibliographyEntries.Execute(Selection)
+                    If objRegExpBibliographyFullEntries.Test(Selection) Then
+                        'gets the matches (all full entries in bibliography according to the regular expression)
+                        Set colMatchesBibliographyFullEntries = objRegExpBibliographyFullEntries.Execute(Selection)
 
-                        'treats all matches (all entries in bibliography) to generate bookmarks
-                        '(we have to find AGAIN every entry to select it and create the bookmark)
-                        For Each objMatchBibliographyEntry In colMatchesBibliographyEntries
-                            'removes the carriage return from match, if necessary
-                            strTempMatch = Replace(objMatchBibliographyEntry.value, Chr(13), "")
+                        'creates an array for the matches in the bibliography that will have a bookmark
+                        ReDim arrStrBookmarksInBilbiography(1 To colMatchesBibliographyFullEntries.Count)
 
-                            'prevents errors if the match is longer than 256 characters
-                            'however, the reference will not be linked if it has more than 20 authors (APA 7th edition)
-                            'or more than 7 authors (APA 6th edition) due to the fact that APA replaces some of them with ellipsis (...)
-                            strSubStringOfTempMatch = Left(strTempMatch, 256)
+                        'treats all matches (all full entries in bibliography) to generate bookmarks
+                        For Each objMatchBibliographyFullEntry In colMatchesBibliographyFullEntries
+                            'checks that the string can be compared
+                            If objRegExpBibliographyEntries.Test(objMatchBibliographyFullEntry.value) Then
+                                'gets the matches (the single entry according to the regular expression)
+                                Set colMatchesBibliographyEntries = objRegExpBibliographyEntries.Execute(objMatchBibliographyFullEntry.value)
 
-                            'according to the version of Mendeley
-                            Select Case intAvailableMendeleyVersion
-                                'Mendeley Desktop 1.x is installed
-                                Case 1
-                                    'selects the current field (Mendeley's bibliography field)
-                                    objCurrentFieldOrContentControl.Select
-                                'Mendeley Reference Manager 2.x is installed
-                                Case 2
-                                    'selects the current content control (Mendeley's bibliography content control)
-                                    objCurrentFieldOrContentControl.range.Select
-                            End Select
+                                'if a match was found in this bibliograpy full entry (there should always be only one)
+                                If colMatchesBibliographyEntries.Count = 1 Then
+                                    'treats all matches (should be only one) to generate bookmarks
+                                    '(we have to find AGAIN every entry to select it and create the bookmark)
+                                    For Each objMatchBibliographyEntry In colMatchesBibliographyEntries
+                                        'removes the carriage return from match, if necessary
+                                        strTempMatch = Replace(objMatchBibliographyEntry.value, Chr(13), "")
+    
+                                        'prevents errors if the match is longer than 256 characters
+                                        'however, the reference will not be linked if it has more than 20 authors (APA 7th edition)
+                                        'or more than 7 authors (APA 6th edition) due to the fact that APA replaces some of them with ellipsis (...)
+                                        strSubStringOfTempMatch = Left(strTempMatch, 256)
+    
+                                        'according to the version of Mendeley
+                                        Select Case intAvailableMendeleyVersion
+                                            'Mendeley Desktop 1.x is installed
+                                            Case 1
+                                                'selects the current field (Mendeley's bibliography field)
+                                                objCurrentFieldOrContentControl.Select
+                                            'Mendeley Reference Manager 2.x is installed
+                                            Case 2
+                                                'selects the current content control (Mendeley's bibliography content control)
+                                                objCurrentFieldOrContentControl.range.Select
+                                        End Select
+    
+                                        'finds and selects the text of the current reference
+                                        blnReferenceEntryFound = False
+                                        With Selection.Find
+                                            .Forward = True
+                                            .Wrap = wdFindStop
+                                            .Text = strSubStringOfTempMatch
+                                            .Execute
+                                            blnReferenceEntryFound = .found
+                                        End With
+    
+                                        'moves the selection, if necessary, to include the full match
+                                        Selection.MoveEnd Unit:=wdCharacter, Count:=Len(strTempMatch) - Len(strSubStringOfTempMatch)
+    
+                                        'checks that the full match is found
+                                        If Selection.Text = strTempMatch Then
+                                            blnReferenceEntryFound = True
+                                        Else
+                                            'there is no more searching, the reference will not be linked in this case
+                                            blnReferenceEntryFound = False
+                                        End If
+    
+                                        'if a match was found (it shall always find it, but good practice)
+                                        'creates the bookmark with the selected text
+                                        If blnReferenceEntryFound Then
+                                            'creates the bookmark
+                                            Selection.Bookmarks.Add _
+                                                Name:="GAUG_SignetBibliographie_" & format(CStr(intReferenceNumber), "00#"), _
+                                                range:=Selection.range
+                                            'adds the entry to the lists of bookmarks
+                                            arrStrBookmarksInBilbiography(intReferenceNumber) = Selection.range.Text
+                                        End If
+    
+                                        'continues with the next number
+                                        intReferenceNumber = intReferenceNumber + 1
+    
+                                    Next 'treats all matches (all entries in bibliography) to generate bookmarks
+                                End If 'if a match was found in this bibliograpy full entry (there should always be only one)
+                            End If 'checks that the string can be compared
+                        Next objMatchBibliographyFullEntry
+                    End If 'checks that the string can be compared
 
-                            'finds and selects the text of the current reference
-                            blnReferenceEntryFound = False
-                            With Selection.Find
-                                .Forward = True
-                                .Wrap = wdFindStop
-                                .Text = strSubStringOfTempMatch
-                                .Execute
-                                blnReferenceEntryFound = .found
-                            End With
-
-                            'moves the selection, if necessary, to include the full match
-                            Selection.MoveEnd Unit:=wdCharacter, Count:=Len(strTempMatch) - Len(strSubStringOfTempMatch)
-
-                            'checks that the full match is found
-                            If Selection.Text = strTempMatch Then
-                                blnReferenceEntryFound = True
-                            Else
-                                'there is no more searching, the reference will not be linked in this case
-                                blnReferenceEntryFound = False
-                            End If
-
-                            'if a match was found (it shall always find it, but good practice)
-                            'creates the bookmark with the selected text
-                            If blnReferenceEntryFound Then
-                                'creates the bookmark
-                                Selection.Bookmarks.Add _
-                                    Name:="GAUG_SignetBibliographie_" & format(CStr(intReferenceNumber), "00#"), _
-                                    range:=Selection.range
-                            End If
-
-                            'continues with the next number
-                            intReferenceNumber = intReferenceNumber + 1
-
-                        Next 'treats all matches (all entries in bibliography) to generate bookmarks
-                    End If
 
                     'by now, we have created all bookmarks and have all entries in colMatchesBibliographyEntries
                     'for future use when creating the hyperlinks
@@ -1602,9 +1626,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 If Not Not varAuthorsFomCitationItem Then
                                     For intAuthorFromCitationItem = 1 To UBound(varAuthorsFomCitationItem)
                                         'gets the last name of the author and adds it to the regular expression (used to find the entry in the bibliography)
-                                        objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & varAuthorsFomCitationItem(intAuthorFromCitationItem) & ".*"
+                                        objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & Replace(Replace(varAuthorsFomCitationItem(intAuthorFromCitationItem), "(", "."), ")", ".") & ".*"
                                         'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
-                                        objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & varAuthorsFomCitationItem(intAuthorFromCitationItem) & ".*"
+                                        objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & Replace(Replace(varAuthorsFomCitationItem(intAuthorFromCitationItem), "(", "."), ")", ".") & ".*"
                                         'if this is the first author of many, this could be the only one listed, and the rest as "et al."
                                         If intAuthorFromCitationItem = 1 And UBound(varAuthorsFomCitationItem) > 1 Then
                                             'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
@@ -1622,9 +1646,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     If Not Not varEditorsFomCitationItem Then
                                         For intEditorFromCitationItem = 1 To UBound(varEditorsFomCitationItem)
                                             'gets the last name of the editor and adds it to the regular expression (used to find the entry in the bibliography)
-                                            objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & varEditorsFomCitationItem(intEditorFromCitationItem) & ".*"
+                                            objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & Replace(Replace(varEditorsFomCitationItem(intEditorFromCitationItem), "(", "."), ")", ".") & ".*"
                                             'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
-                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & varEditorsFomCitationItem(intEditorFromCitationItem) & ".*"
+                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & Replace(Replace(varEditorsFomCitationItem(intEditorFromCitationItem), "(", "."), ")", ".") & ".*"
                                             'if this is the first editor of many, this could be the only one listed, and the rest as "et al."
                                             If intEditorFromCitationItem = 1 And UBound(varEditorsFomCitationItem) > 1 Then
                                                 'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
@@ -1647,6 +1671,10 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 '    varPartsFromVisibleCitationItem(1) & "*" & varPartsFromVisibleCitationItem(2) & "*" & varPartsFromVisibleCitationItem(3) & "*" & vbCrLf & vbCrLf & _
                                 '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & vbCrLf & _
                                 '    objRegExpFindBibliographyEntry.Pattern
+                                'ActiveDocument.Content.InsertAfter Text:=vbCrLf & vbCrLf & _
+                                '    objMatchVisibleCitationItem.value & vbCrLf & _
+                                '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & _
+                                '    objRegExpFindBibliographyEntry.Pattern & vbCrLf
 
                                 'if the current visible citation item has authors's family names (not only the year)
                                 If Len(varPartsFromVisibleCitationItem(1)) > 0 Then
@@ -1687,10 +1715,10 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         intReferenceNumber = 1
                         'finds the position of the citation entry in the list of references in the bibliography
                         blnReferenceEntryFound = False
-                        For Each objMatchBibliographyEntry In colMatchesBibliographyEntries
-                            'MsgBox ("Searching for citation in bibliography:" & vbCrLf & vbCrLf & "Using..." & vbCrLf & objRegExpFindBibliographyEntry.Pattern & vbCrLf & objMatchBibliographyEntry.value)
+                        For Each strBookmarksInBilbiography In arrStrBookmarksInBilbiography
+                            'MsgBox ("Searching for citation in bibliography:" & vbCrLf & vbCrLf & "Using..." & vbCrLf & objRegExpFindBibliographyEntry.Pattern & vbCrLf & strBookmarksInBilbiography)
                             'gets the matches, if any, to check if this reference entry corresponds to the visible citation item being treated
-                            Set colMatchesFindBibliographyEntry = objRegExpFindBibliographyEntry.Execute(objMatchBibliographyEntry.value)
+                            Set colMatchesFindBibliographyEntry = objRegExpFindBibliographyEntry.Execute(strBookmarksInBilbiography)
                             'if the this is the corresponding reference entry
                             'Verify for MabEntwickeltSich: perhaps a more strict verification is needed
                             If colMatchesFindBibliographyEntry.Count > 0 Then
@@ -2173,7 +2201,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
                 End Select
 
                 'checks that the string can be compared
-                If objRegExpVisibleCitationItems.Test(Selection) = True Then
+                If objRegExpVisibleCitationItems.Test(Selection) Then
                     'gets the matches (all entries in the citation according to the regular expression)
                     Set colMatchesVisibleCitationItems = objRegExpVisibleCitationItems.Execute(Selection)
 
@@ -2308,9 +2336,9 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     'if orphan citations exist
     If Len(strOrphanCitationItems) > 0 Then
         MsgBox "Orphan citation entries found:" & vbCrLf & vbCrLf & _
-        strOrphanCitationItems & vbCrLf & _
-        "Remove them from the document or manually create the bookmarks and hyperlinks!", _
-        vbExclamation, "GAUG_createHyperlinksForCitationsIEEE()"
+            strOrphanCitationItems & vbCrLf & _
+            "Remove them from the document or manually create the bookmarks and hyperlinks!", _
+            vbExclamation, "GAUG_createHyperlinksForCitationsIEEE()"
     End If
 
     'if hyperlinks where not generated for the URLs in the bibliography
