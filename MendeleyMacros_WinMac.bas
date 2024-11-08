@@ -1,4 +1,7 @@
 Attribute VB_Name = "MendeleyMacros"
+Option Explicit
+
+
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
@@ -22,7 +25,7 @@ Function GAUG_isMendeleyCiteOMaticPluginInstalled() As Boolean
     'checks all AddIns
     For Each installedAddin In Application.AddIns
         'if Mendeley 1.x has been found
-        If Left(installedAddin.Name, 11) = "Mendeley-1." Then
+        If Left(installedAddin.name, 11) = "Mendeley-1." Then
             blnFound = True
             'exits loop
             Exit For
@@ -136,7 +139,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-21                                                                                                                **
+'**  Last modified: 2024-10-23                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getMendeleyWebExtensionXMLFileContents()                                                                                   **
 '**                                                                                                                                           **
@@ -144,7 +147,6 @@ End Function
 '**  Extracts the contents of the .zip file and searches for the file 'word\webextensions\webextension<number>.xml' that                      **
 '**     corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite).                                                           **
 '**  Reads the contents of the file 'word\webextensions\webextension<number>.xml'                                                             **
-'**                                                                                                                                           **
 '**                                                                                                                                           **
 '**  RETURNS: A string with the contents (if any) of the file 'webextension<number>.xml' that corresponds                                     **
 '**     to Mendeley Reference Manager 2.x (with the App Mendeley Cite).                                                                       **
@@ -171,13 +173,20 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
     On Error Resume Next
     'creates an ADODB.Stream object (used to read the UTF-8 XML files)
     Set adoStream = CreateObject("ADODB.Stream")
-    'checks if the object ADODB.Stream was succesfully created
+    'checks if the object ADODB.Stream was successfully created
     If Err.Number <> 0 Then
         'The reference to 'Microsoft ActiveX Data Objects 6.1 Library' has not been added, object ADODB.Stream is not available
         '(the reference is automatically added, this error just means that object ADODB.Stream was not created)
+        '(or, this is running on macOS and the reference to 'Microsoft ActiveX Data Objects 6.1 Library' does not exist)
         MsgBox "Your document exceeds the maximum number of citations." & vbCrLf & vbCrLf & _
             "ADODB.Stream is necessary in this extreme case." & vbCrLf & _
             "Enable the ADODB object and try again." & vbCrLf & vbCrLf & _
+            "If you are running the macros on macOS," & vbCrLf & _
+            "ADODB.Stream is not available for you." & vbCrLf & _
+            "However, removing the abstracts from all the entries" & vbCrLf & _
+            "in Mendeley Reference Manager 2.x may help." & vbCrLf & _
+            "Refresh the bibliography after removing the abstracts" & vbCrLf & _
+            "and try again." & vbCrLf & vbCrLf & _
             "Cannot continue creating hyperlinks.", _
             vbCritical, "lateBinding()"
 
@@ -198,7 +207,7 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
     'checks if the document has a file path (if it is saved)
     If ActiveDocument.Path <> "" Then
         'gets the name, path and full name of the active document
-        strDocumentName = ActiveDocument.Name
+        strDocumentName = ActiveDocument.name
         strDocumentPath = ActiveDocument.Path
         strDocumentFullName = ActiveDocument.FullName
 
@@ -231,11 +240,11 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
             'we need to find the file that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
 
             'iterates over all files in folder 'word\webextensions\'
-            For Each objFile In objFileSystem.getfolder(CVar(strTemporalFolder & "\" & "word\webextensions")).Files
+            For Each objFile In objFileSystem.GetFolder(CVar(strTemporalFolder & "\" & "word\webextensions")).Files
                 'if the file name starts with 'webextension' and finishes with '.xml'
-                If (Left(objFile.Name, 12) = "webextension") And (Right(objFile.Name, 4) = ".xml") Then
+                If (Left(objFile.name, 12) = "webextension") And (Right(objFile.name, 4) = ".xml") Then
                     'creates the path to the 'webextension<number>.xml' file inside the unzipped folder
-                    strWebExtensionXMLFullName = strTemporalFolder & "\word\webextensions\" & objFile.Name
+                    strWebExtensionXMLFullName = strTemporalFolder & "\word\webextensions\" & objFile.name
 
                     'checks if the file 'webextension<number>.xml' exists
                     If objFileSystem.FileExists(strWebExtensionXMLFullName) Then
@@ -274,7 +283,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-21                                                                                                                **
+'**  Last modified: 2024-10-23                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getAllCitationsFullInformation(intMendeleyVersion As Integer) As String                                                    **
 '**                                                                                                                                           **
@@ -294,9 +303,8 @@ End Function
 '***********************************************************************************************************************************************
 Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer) As String
 
-    Dim objRegExpWordOpenXMLCitations As Object
-    Dim colMatchesWordOpenXMLCitations As Object
-    Dim objMatchWordOpenXMLCitations As Object
+    Dim strWordOpenXML As String
+    Dim lngStartPosition, lngFirstPossibleEndPosition, lngSecondPossibleEndPosition As Long
     Dim strAllCitationsFullInformation As String
     Dim blnFound As Boolean
 
@@ -326,23 +334,15 @@ Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer
 
         'Mendeley Reference Manager 2.x is installed
         Case 2
-            Set objRegExpWordOpenXMLCitations = CreateObject("VBScript.RegExp")
             'ActiveDocument.WordOpenXML contains everything on the document, including hidden information about the citations added by Mendeley's plugin
             'we need that hidden information to be able to match every citation to the corresponding entry in the bibliography
             '(the information is stored as one block of data within WordOpenXML)
-            'sets the pattern to match everything from '<we:property name="MENDELEY_CITATIONS"' to (but not including) '<we:property name="MENDELEY_CITATIONS_STYLE"' or '</we:properties><we:bindings/>'
-            'for details on the regular expression, see https://stackoverflow.com/questions/7124778/how-can-i-match-anything-up-until-this-sequence-of-characters-in-a-regular-exp
-            objRegExpWordOpenXMLCitations.Pattern = "<we:property name=\" & Chr(34) & "MENDELEY_CITATIONS\" & Chr(34) & ".+?(?=((<we:property name=\" & Chr(34) & "MENDELEY_CITATIONS_STYLE\" & Chr(34) & ")|(</we:properties><we:bindings/>)))"
-            'sets case insensitivity
-            objRegExpWordOpenXMLCitations.IgnoreCase = False
-            'sets global applicability
-            objRegExpWordOpenXMLCitations.Global = True
 
             'sets error handling for testing if the instruction 'ActiveDocument.WordOpenXML' can return the full document
             On Error Resume Next
             'gets the full XML of the document
             strWordOpenXML = ActiveDocument.WordOpenXML
-            'checks if 'ActiveDocument.WordOpenXML' was succesful
+            'checks if 'ActiveDocument.WordOpenXML' was successful
             If Err.Number <> 0 Then
                 'if file 'word\webextensions\webextension<number>.xml' is bigger than 1MB, the instruction 'ActiveDocument.WordOpenXML' fails
                 'better to directly read the file 'word\webextensions\webextension<number>.xml'
@@ -351,27 +351,38 @@ Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer
             'sets back default error handling by VBA
             On Error GoTo 0
 
-            'checks that the string can be compared
-            If objRegExpWordOpenXMLCitations.Test(strWordOpenXML) Then
-                'gets the matches (all information of citations according to the regular expression)
-                Set colMatchesWordOpenXMLCitations = objRegExpWordOpenXMLCitations.Execute(strWordOpenXML)
+            'gets the initial position of the text that contains the full information of all citations
+            '(citations start with '<we:property name="MENDELEY_CITATIONS"')
+            lngStartPosition = InStr(strWordOpenXML, "<we:property name=" & Chr(34) & "MENDELEY_CITATIONS" & Chr(34))
+            'gets the position of the start of Mendeley's citation style (this could be the position where the text that contains the full information of all citations ends)
+            '(citation style start with '<we:property name="MENDELEY_CITATIONS_STYLE"')
+            lngFirstPossibleEndPosition = InStr(strWordOpenXML, "<we:property name=" & Chr(34) & "MENDELEY_CITATIONS_STYLE" & Chr(34))
+            'gets the position of the end of the block of text (this could be the position where the text that contains the full information of all citations ends)
+            '(the end of the block starts with '</we:properties><we:bindings/>')
+            lngSecondPossibleEndPosition = InStr(strWordOpenXML, "</we:properties><we:bindings/>")
 
-                'there should be only one match which contains the information of all citations
-                If colMatchesWordOpenXMLCitations.Count = 1 Then
-                    blnFound = True
-                    'treats all matches (the only one)
-                    For Each objMatchWordOpenXMLCitations In colMatchesWordOpenXMLCitations
-                        'replaces all '&quot;' by '"' to handle the string more easily
-                        strAllCitationsFullInformation = Replace(objMatchWordOpenXMLCitations.value, "&quot;", Chr(34))
-                    Next objMatchWordOpenXMLCitations
+
+            'if the substrings where found
+            If (lngStartPosition > 0 And lngFirstPossibleEndPosition > 0 And lngSecondPossibleEndPosition > 0) Then
+                blnFound = True
+                'if the citations are located before the citation style in the block of text
+                If lngStartPosition < lngFirstPossibleEndPosition Then
+                    'gets the full information of all citations
+                    strAllCitationsFullInformation = Mid(strWordOpenXML, lngStartPosition, lngFirstPossibleEndPosition - lngStartPosition)
+                'if the citation style is located before the citations in the block of text
+                Else
+                    'gets the full information of all citations
+                    strAllCitationsFullInformation = Mid(strWordOpenXML, lngStartPosition, lngSecondPossibleEndPosition - lngStartPosition)
                 End If
+                'replaces all '&quot;' by '"' to handle the string more easily
+                strAllCitationsFullInformation = Replace(strAllCitationsFullInformation, "&quot;", Chr(34))
             End If
     End Select
 
 
-    'if no information could be found (or many matches where found which is not expected)
+    'if no information could be found
     If Not blnFound Then
-        MsgBox "Could not find ONLY one match when looking for the full information of all citations." & vbCrLf & vbCrLf & _
+        MsgBox "Could not find the full information of all citations." & vbCrLf & vbCrLf & _
             "Cannot continue creating hyperlinks.", _
             vbCritical, "GAUG_getAllCitationsFullInformation(intMendeleyVersion)"
 
@@ -390,7 +401,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-02                                                                                                                **
+'**  Last modified: 2024-10-23                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal strAllCitationsFullInformation As String,                   **
 '**     ByVal fldCitation As Field, ByVal ccCitation As ContentControl) As String                                                             **
@@ -414,9 +425,7 @@ End Function
 '***********************************************************************************************************************************************
 Function GAUG_getCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal strAllCitationsFullInformation As String, ByVal fldCitation As Field, ByVal ccCitation As ContentControl) As String
 
-    Dim objRegExpVisibleCitationItems As Object
-    Dim colMatchesVisibleCitationItems As Object
-    Dim objMatchVisibleCitationItem As Object
+    Dim lngStartPositionOfCitation, lngEndPositionOfCitation, lngLengthOfCitation As Long
     Dim strCitationFullInfo As String
     Dim blnFound As Boolean
 
@@ -452,33 +461,35 @@ Function GAUG_getCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal str
         Case 2
             'if the citation's content control is not empty
             If Not (ccCitation Is Nothing) Then
-                'creates the object for regular expressions
-                Set objRegExpVisibleCitationItems = CreateObject("VBScript.RegExp")
-                'sets the pattern to match everything from '"citationID":"MENDELEY_CITATION_' to (but not including) '"citationID":"MENDELEY_CITATION_' or to the end of the string
-                'this gets individual citations, then the correct one can be selected
-                objRegExpVisibleCitationItems.Pattern = "{\" & Chr(34) & "citationID\" & Chr(34) & ":\" & Chr(34) & "MENDELEY_CITATION_.+?(?=(({\" & Chr(34) & "citationID\" & Chr(34) & ":\" & Chr(34) & "MENDELEY_CITATION_)|($)))"
-                'sets case insensitivity
-                objRegExpVisibleCitationItems.IgnoreCase = False
-                'sets global applicability
-                objRegExpVisibleCitationItems.Global = True
+                'initializes the start position (the start position, in the text, of the citation we need)
+                lngStartPositionOfCitation = 1
+                'iterates over all citations in the block of text
+                Do
+                    'gets the initial position of the text that contains the full information of the next citation
+                    '(citations start with '{"citationID":"MENDELEY_CITATION_')
+                    lngEndPositionOfCitation = InStr(lngStartPositionOfCitation, strAllCitationsFullInformation, "{" & Chr(34) & "citationID" & Chr(34) & ":" & Chr(34) & "MENDELEY_CITATION_")
 
-                'checks that the string can be compared
-                If objRegExpVisibleCitationItems.Test(strAllCitationsFullInformation) Then
-                    'gets the matches (all information of individual citations according to the regular expression)
-                    Set colMatchesVisibleCitationItems = objRegExpVisibleCitationItems.Execute(strAllCitationsFullInformation)
+                    'calculates the length of the current citation
+                    If lngEndPositionOfCitation = 0 Then
+                        lngLengthOfCitation = Len(strAllCitationsFullInformation)
+                    Else
+                        lngLengthOfCitation = lngEndPositionOfCitation - lngStartPositionOfCitation
+                    End If
 
-                    'treats all matches (all individual citations) to find the correct one
-                    For Each objMatchVisibleCitationItem In colMatchesVisibleCitationItems
-                        'if the tag of the searched citation is in the current match
-                        If InStr(1, objMatchVisibleCitationItem.value, ccCitation.Tag, vbTextCompare) > 0 Then
-                            blnFound = True
-                            'the full information of the citation is in this match
-                            strCitationFullInfo = objMatchVisibleCitationItem.value
-                            'exits loop
-                            Exit For
-                        End If
-                    Next objMatchVisibleCitationItem
-                End If 'checks that the string can be compared
+                    'if the tag of the searched citation is in the current match
+                    If InStr(1, Mid(strAllCitationsFullInformation, lngStartPositionOfCitation, lngLengthOfCitation), ccCitation.Tag, vbTextCompare) > 0 Then
+                        blnFound = True
+                        'the full information of the citation is in this match
+                        strCitationFullInfo = Mid(strAllCitationsFullInformation, lngStartPositionOfCitation, lngLengthOfCitation)
+                        'exits loop
+                        Exit Do
+                    End If
+
+                    'moves the start position for the next iteration
+                    '(adding extra characters to prevent finding the same "next citation" next time)
+                    lngStartPositionOfCitation = lngEndPositionOfCitation + 10
+
+                Loop While lngEndPositionOfCitation > 0
 
             End If 'if the citation's content control is not empty
     End Select
@@ -524,8 +535,10 @@ End Function
 '***********************************************************************************************************************************************
 Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal strCitationFullInfo As String) As Variant()
 
+    Dim lngLengthOfCitationItem As Long
+    Dim varCitationItemsPositionsFromCitationFullInfo() As Variant
     Dim varCitationItemsFromCitationFullInfo() As Variant
-    Dim intTotalCitationItems As Integer
+    Dim i, intTotalCitationItems As Integer
 
     Dim objRegExpCitationItems As Object
     Dim colMatchesCitationItems As Object
@@ -547,11 +560,11 @@ Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As I
     'if the citation's full info is not empty
     If Not (strCitationFullInfo = "") Then
 
-        Set objRegExpCitationItems = CreateObject("VBScript.RegExp")
+        Set objRegExpCitationItems = New GAUG_RegExp
         'sets case insensitivity
-        objRegExpCitationItems.IgnoreCase = False
+        objRegExpCitationItems.ignoreCase = False
         'sets global applicability
-        objRegExpCitationItems.Global = True
+        objRegExpCitationItems.GlobalSearch = True
 
         'initializes the counter
         intTotalCitationItems = 0
@@ -560,15 +573,15 @@ Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As I
         Select Case intMendeleyVersion
             'Mendeley Desktop 1.x is installed
             Case 1
-                'sets the pattern to match everything from '{"id":"ITEM' to (but not including) ',{"id":"ITEM' or to the end of the string if no other item is found
-                'this gets individual citation items
-                objRegExpCitationItems.Pattern = "{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34) & "ITEM.+?(?=((,\s*{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34) & "ITEM)|($)))"
+                'sets the pattern to match '{"id":"ITEM'
+                '(all individual citation items start with '{"id":"ITEM')
+                objRegExpCitationItems.pattern = "\{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34) & "ITEM"
 
             'Mendeley Reference Manager 2.x is installed
             Case 2
-                'sets the pattern to match everything from '{"id":"' to (but not including) ',{"id":"' or to the end of the string if no other item is found
-                'this gets individual citation items
-                objRegExpCitationItems.Pattern = "{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34) & ".+?(?=((,\s*{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34) & ")|($)))"
+                'sets the pattern to match '{"id":"'
+                '(all individual citation items start with '{"id":"'
+                objRegExpCitationItems.pattern = "\{\s*\" & Chr(34) & "id\" & Chr(34) & "\s*:\s*\" & Chr(34)
         End Select
 
 
@@ -579,17 +592,35 @@ Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As I
 
             'treats all matches (all individual citation items)
             For Each objMatchVisibleCitationItemItem In colMatchesCitationItems
-                'MsgBox objMatchVisibleCitationItemItem.value
                 'updates the counter to include this citation item
                 intTotalCitationItems = intTotalCitationItems + 1
-                'adds the full information of the citation item to the list
-                ReDim Preserve varCitationItemsFromCitationFullInfo(1 To intTotalCitationItems)
-                varCitationItemsFromCitationFullInfo(intTotalCitationItems) = objMatchVisibleCitationItemItem.value
+                'adds the start position of the full information of the citation item to the list
+                ReDim Preserve varCitationItemsPositionsFromCitationFullInfo(1 To intTotalCitationItems)
+                varCitationItemsPositionsFromCitationFullInfo(intTotalCitationItems) = objMatchVisibleCitationItemItem.FirstIndex
             Next objMatchVisibleCitationItemItem
+
+            're-dimensions the array to store the full information of the citation items
+            ReDim varCitationItemsFromCitationFullInfo(1 To intTotalCitationItems)
+
+            'treats all individual citation items
+            For i = 1 To intTotalCitationItems
+                'if this is the last citation item
+                If i = intTotalCitationItems Then
+                    'the length is from the current citation item to the end of the string
+                    lngLengthOfCitationItem = Len(strCitationFullInfo) - varCitationItemsPositionsFromCitationFullInfo(i)
+                'if this is not the last citation item
+                Else
+                    'the length is from the current citation item to the next citation item
+                    lngLengthOfCitationItem = varCitationItemsPositionsFromCitationFullInfo(i + 1) - varCitationItemsPositionsFromCitationFullInfo(i)
+                End If 'if this is the last citation item
+
+                'adds the full information of the citation item to the list
+                varCitationItemsFromCitationFullInfo(i) = Mid(strCitationFullInfo, varCitationItemsPositionsFromCitationFullInfo(i) + 1, lngLengthOfCitationItem)
+                'MsgBox Len(varCitationItemsFromCitationFullInfo(intTotalCitationItems))
+            Next
         End If 'checks that the string can be compared
 
     End If 'if the citation's full info is not empty
-
 
     'returns the list of all items (individual citations within the field or content control) from the citation full information
     GAUG_getCitationItemsFromCitationFullInfo = varCitationItemsFromCitationFullInfo
@@ -625,7 +656,7 @@ End Function
 '***********************************************************************************************************************************************
 Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal strAuthorEditor As String, ByVal strCitationItem As String) As Variant()
 
-    Dim varAuthorsFomCitationItem() As Variant
+    Dim varAuthorsFromCitationItem() As Variant
     Dim intTotalAuthorsEditorsFromCitationItem As Integer
     Dim strFamilyName As String
 
@@ -660,11 +691,11 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
     'if the citation item's full info is not empty
     If Not (strCitationItem = "") Then
 
-        Set objRegExpAuthorsFromCitationItem = CreateObject("VBScript.RegExp")
+        Set objRegExpAuthorsFromCitationItem = New GAUG_RegExp
         'sets case insensitivity
-        objRegExpAuthorsFromCitationItem.IgnoreCase = False
+        objRegExpAuthorsFromCitationItem.ignoreCase = False
         'sets global applicability
-        objRegExpAuthorsFromCitationItem.Global = True
+        objRegExpAuthorsFromCitationItem.GlobalSearch = True
 
         'builds the regular expression according to the version of Mendeley
         Select Case intMendeleyVersion
@@ -672,13 +703,13 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
             Case 1
                 'sets the pattern to match everything from '"author":[' or '"editor":[' to (but not including) ']'
                 'this gets the full list of authors from the citation item
-                objRegExpAuthorsFromCitationItem.Pattern = "\" & Chr(34) & strAuthorEditor & "\" & Chr(34) & "\s*:\s*\[.+?(?=\])"
+                objRegExpAuthorsFromCitationItem.pattern = "\" & Chr(34) & strAuthorEditor & "\" & Chr(34) & "\s*:\s*\[.+?(?=\])"
 
             'Mendeley Reference Manager 2.x is installed
             Case 2
                 'sets the pattern to match everything from '"author":[' or '"editor":[' to (but not including) ']'
                 'this gets the full list of authors from the citation item
-                objRegExpAuthorsFromCitationItem.Pattern = "\" & Chr(34) & strAuthorEditor & "\" & Chr(34) & "\s*:\s*\[.+?(?=\])"
+                objRegExpAuthorsFromCitationItem.pattern = "\" & Chr(34) & strAuthorEditor & "\" & Chr(34) & "\s*:\s*\[.+?(?=\])"
         End Select
 
 
@@ -690,11 +721,11 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
             'treats all matches (there should be at most one match, zero when editors are listed instead of the authors)
             For Each objMatchAuthorFromCitationItem In colMatchesAuthorsFromCitationItem
 
-                Set objRegExpAuthorFamilyNamesFromCitationItem = CreateObject("VBScript.RegExp")
+                Set objRegExpAuthorFamilyNamesFromCitationItem = New GAUG_RegExp
                 'sets case insensitivity
-                objRegExpAuthorFamilyNamesFromCitationItem.IgnoreCase = False
+                objRegExpAuthorFamilyNamesFromCitationItem.ignoreCase = False
                 'sets global applicability
-                objRegExpAuthorFamilyNamesFromCitationItem.Global = True
+                objRegExpAuthorFamilyNamesFromCitationItem.GlobalSearch = True
 
                 'initializes the counter
                 intTotalAuthorsEditorsFromCitationItem = 0
@@ -705,13 +736,13 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
                     Case 1
                         'sets the pattern to match everything from '"family":"' to (but not including) '"'
                         'this gets the family names of authors from the citation item
-                        objRegExpAuthorFamilyNamesFromCitationItem.Pattern = "\" & Chr(34) & "family\" & Chr(34) & "\s*:\s*\" & Chr(34) & ".+?(?=\" & Chr(34) & ")"
+                        objRegExpAuthorFamilyNamesFromCitationItem.pattern = "\" & Chr(34) & "family\" & Chr(34) & "\s*:\s*\" & Chr(34) & ".+?(?=\" & Chr(34) & ")"
 
                     'Mendeley Reference Manager 2.x is installed
                     Case 2
                         'sets the pattern to match everything from '{"family":"' to (but not including) '"'
                         'this gets the family names of authors from the citation item
-                        objRegExpAuthorFamilyNamesFromCitationItem.Pattern = "{\s*\" & Chr(34) & "family\" & Chr(34) & "\s*:\s*\" & Chr(34) & ".+?(?=\" & Chr(34) & ")"
+                        objRegExpAuthorFamilyNamesFromCitationItem.pattern = "\{\s*\" & Chr(34) & "family\" & Chr(34) & "\s*:\s*\" & Chr(34) & ".+?(?=\" & Chr(34) & ")"
                 End Select
 
 
@@ -728,8 +759,8 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
                         'updates the counter to include this family name of the author
                         intTotalAuthorsEditorsFromCitationItem = intTotalAuthorsEditorsFromCitationItem + 1
                         'adds the family name of the author to the list
-                        ReDim Preserve varAuthorsFomCitationItem(1 To intTotalAuthorsEditorsFromCitationItem)
-                        varAuthorsFomCitationItem(intTotalAuthorsEditorsFromCitationItem) = strFamilyName
+                        ReDim Preserve varAuthorsFromCitationItem(1 To intTotalAuthorsEditorsFromCitationItem)
+                        varAuthorsFromCitationItem(intTotalAuthorsEditorsFromCitationItem) = strFamilyName
                     Next objMatchAuthorFamilyNameFromCitationItem
                 End If 'checks that the string can be compared
 
@@ -742,7 +773,7 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
 
 
     'returns the list of the family names of the authors
-    GAUG_getAuthorsEditorsFromCitationItem = varAuthorsFomCitationItem
+    GAUG_getAuthorsEditorsFromCitationItem = varAuthorsFromCitationItem
 
 End Function
 
@@ -791,11 +822,11 @@ Function GAUG_getYearFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal
     'if the citation item's full info is not empty
     If Not (strCitationItem = "") Then
 
-        Set objRegExpYearFromCitationItem = CreateObject("VBScript.RegExp")
+        Set objRegExpYearFromCitationItem = New GAUG_RegExp
         'sets case insensitivity
-        objRegExpYearFromCitationItem.IgnoreCase = False
+        objRegExpYearFromCitationItem.ignoreCase = False
         'sets global applicability
-        objRegExpYearFromCitationItem.Global = True
+        objRegExpYearFromCitationItem.GlobalSearch = True
 
         'builds the regular expression according to the version of Mendeley
         Select Case intMendeleyVersion
@@ -803,13 +834,13 @@ Function GAUG_getYearFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal
             Case 1
                 'sets the pattern to match everything from '"issued":{"date-parts":[[' to (but not including) ']]' or ','
                 'this gets only the year from the citation item, skips the month if present
-                objRegExpYearFromCitationItem.Pattern = "\" & Chr(34) & "issued\" & Chr(34) & "\s*:\s*{\s*\" & Chr(34) & "date\-parts\" & Chr(34) & "\s*:\s*\[\s*\[.+?(?=((\s*\]\s*\])|(,)))"
+                objRegExpYearFromCitationItem.pattern = "\" & Chr(34) & "issued\" & Chr(34) & "\s*:\s*\{\s*\" & Chr(34) & "date\-parts\" & Chr(34) & "\s*:\s*\[\s*\[.+?(?=((\s*\]\s*\])|(,)))"
 
             'Mendeley Reference Manager 2.x is installed
             Case 2
                 'sets the pattern to match everything from '"issued":{"date-parts":[[' to (but not including) ']]' or ','
                 'this gets only the year from the citation item, skips the month if present
-                objRegExpYearFromCitationItem.Pattern = "\" & Chr(34) & "issued\" & Chr(34) & "\s*:\s*{\s*\" & Chr(34) & "date\-parts\" & Chr(34) & "\s*:\s*\[\s*\[.+?(?=((\s*\]\s*\])|(,)))"
+                objRegExpYearFromCitationItem.pattern = "\" & Chr(34) & "issued\" & Chr(34) & "\s*:\s*\{\s*\" & Chr(34) & "date\-parts\" & Chr(34) & "\s*:\s*\[\s*\[.+?(?=((\s*\]\s*\])|(,)))"
         End Select
 
 
@@ -931,7 +962,7 @@ Function GAUG_getSafeStringForRegularExpressions(ByVal strOriginalString As Stri
     Dim arrSpecialCharacters(), strSpecialCharacter As Variant
 
 
-    'defines the special characters, "\" must be first, otherwise it will be escaped miltiple times
+    'defines the special characters, "\" must be first, otherwise it will be escaped multiple times
     arrSpecialCharacters = Array("\", ".", "[", "]", "{", "}", "(", ")", "<", ">", "*", "+", "-", "=", "!", "?", "^", "$", "|")
 
     'iterates over all characters in the original string
@@ -998,13 +1029,13 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
 
 
     'creates the object for regular expressions (to get all URLs in bibliography)
-    Set objRegExpURL = CreateObject("VBScript.RegExp")
+    Set objRegExpURL = New GAUG_RegExp
     'sets the pattern to match every URL in the bibliography (http, https or ftp)
-    objRegExpURL.Pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
+    objRegExpURL.pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
     'sets case insensitivity
-    objRegExpURL.IgnoreCase = False
+    objRegExpURL.ignoreCase = False
     'sets global applicability
-    objRegExpURL.Global = True
+    objRegExpURL.GlobalSearch = True
 
 
     Select Case intMendeleyVersion
@@ -1040,7 +1071,7 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
         For Each varNonDetectedURL In arrNonDetectedURLs
             'prevents errors if the match is longer than 256 characters
             strSubStringOfURL = Left(CStr(varNonDetectedURL), 256)
-    
+
             'according to the version of Mendeley
             Select Case intMendeleyVersion
                 'Mendeley Desktop 1.x is installed
@@ -1052,7 +1083,7 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
                     'selects the current content control (Mendeley's bibliography content control)
                     objCurrentFieldOrContentControl.range.Select
             End Select
-    
+
             'finds all instances of current URL
             Do
                 'finds and selects the text of the URL
@@ -1063,11 +1094,11 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
                     .Execute
                     blnURLFound = .found
                 End With
-    
+
                 If blnURLFound Then
                     'moves the selection, if necessary, to include the full match
                     Selection.MoveEnd Unit:=wdCharacter, Count:=Len(CStr(varNonDetectedURL)) - Len(strSubStringOfURL)
-    
+
                     'checks that the full match is found
                     If Selection.Text = CStr(varNonDetectedURL) Then
                         blnURLFound = True
@@ -1077,7 +1108,7 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
                         intTotalURLsWithoutHyperlink = intTotalURLsWithoutHyperlink + 1
                     End If
                 End If
-    
+
                 'creates the hyperlink
                 If blnURLFound Then
                     'checks there is no hyperlink already
@@ -1087,7 +1118,7 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
                             ScreenTip:=""
                     End If
                 End If
-    
+
             Loop Until (Not blnURLFound) 'finds all instances of current URL
         Next 'generates the hyperlinks from the list of non detected URLs
     End If 'if the array of non detected URLs is not empty
@@ -1188,7 +1219,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-09                                                                                                                **
+'**  Last modified: 2024-10-23                                                                                                                **
 '**                                                                                                                                           **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                                                                               **
 '**                                                                                                                                           **
@@ -1204,10 +1235,10 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim documentSection As Section
     Dim blnFound, blnBibliographyFound, blnCitationFound, blnReferenceEntryFound, blnCitationEntryFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
     Dim intReferenceNumber As Integer
-    Dim objRegExpBibliographyEntries, objRegExpBibliographyFullEntries, objRegExpVisibleCitationItems, objRegExpFindBibliographyEntry, objRegExpFindVisibleCitationItem, objRegExpURL As Object
-    Dim colMatchesBibliographyEntries, colMatchesBibliographyFullEntries, colMatchesVisibleCitationItems, colMatchesFindBibliographyEntry, colMatchesFindVisibleCitationItem, colMatchesURL As Object
-    Dim objMatchBibliographyEntry, objMatchBibliographyFullEntry, objMatchVisibleCitationItem, objMatchFindBibliographyEntry, objMatchURL As Object
-    Dim strBookmarkInBibliography, arrStrBookmarksInBilbiography() As String
+    Dim objRegExpBibliographyEntries, objRegExpVisibleCitationItems, objRegExpFindBibliographyEntry, objRegExpFindVisibleCitationItem, objRegExpURL As Object
+    Dim colMatchesBibliographyEntries, colMatchesVisibleCitationItems, colMatchesFindBibliographyEntry, colMatchesFindVisibleCitationItem, colMatchesURL As Object
+    Dim objMatchBibliographyEntry, objMatchVisibleCitationItem, objMatchFindBibliographyEntry, objMatchURL As Object
+    Dim strBookmarkInBibliography, arrStrBookmarksInBibliography() As String
     Dim strTempMatch, strSubStringOfTempMatch, strLastAuthorsOrEditors As String
     Dim strTypeOfExecution As String
     Dim blnMabEntwickeltSich As Boolean
@@ -1221,15 +1252,17 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim strAllCitationsFullInformation, strCitationFullInfo As String
     Dim varCitationItemsFromCitationFullInfo() As Variant
     Dim varPartsFromVisibleCitationItem() As Variant
-    Dim varAuthorsFomCitationItem() As Variant
-    Dim varEditorsFomCitationItem() As Variant
-    Dim varYearFomCitationItem As String
-    Dim intAuthorFromCitationItem, intEditorFomCitationItem As Integer
+    Dim varAuthorsFromCitationItem() As Variant
+    Dim varEditorsFromCitationItem() As Variant
+    Dim varYearFromCitationItem As String
+    Dim intAuthorFromCitationItem, intEditorFromCitationItem As Integer
     Dim intCitationItemFromCitationFullInfo As Integer
     Dim strOrphanCitationItems As String
     Dim varFieldsOrContentControls As Variant
     Dim currentPosition As range
     Dim intTotalURLsWithoutHyperlink As Integer
+    Dim strBibliographyFullEntries() As String
+    Dim lngCurrentBibliographyFullEntry As Long
 
 
 '*****************************
@@ -1331,31 +1364,23 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 '*****************************
 '*   Creation of bookmarks   *
 '*****************************
-    'creates the object for regular expressions (to get all full entries in bibliography)
-    Set objRegExpBibliographyFullEntries = CreateObject("VBScript.RegExp")
-    'sets the pattern to match every reference full entry in the bibliography (from the first author until a new line is found)
-    objRegExpBibliographyFullEntries.Pattern = "((^)|(\r)).+?(?=((\r)|($)))"
-    'sets case insensitivity
-    objRegExpBibliographyFullEntries.IgnoreCase = False
-    'sets global applicability
-    objRegExpBibliographyFullEntries.Global = True
     'creates the object for regular expressions (to get the entry's text in the bibliography to create the bookmark)
-    Set objRegExpBibliographyEntries = CreateObject("VBScript.RegExp")
+    Set objRegExpBibliographyEntries = New GAUG_RegExp
     'sets the pattern to match the reference entry
     '(all text from the beginning of the string until a year between parentheses is found)
-    objRegExpBibliographyEntries.Pattern = "^.*\.\s\(\d\d\d\d[a-zA-Z]?\)"
+    objRegExpBibliographyEntries.pattern = "^.*\.\s\(\d\d\d\d[a-zA-Z]?\)"
     'sets case insensitivity
-    objRegExpBibliographyEntries.IgnoreCase = False
+    objRegExpBibliographyEntries.ignoreCase = False
     'sets global applicability
-    objRegExpBibliographyEntries.Global = True
+    objRegExpBibliographyEntries.GlobalSearch = True
     'creates the object for regular expressions (to get all URLs in bibliography)
-    Set objRegExpURL = CreateObject("VBScript.RegExp")
+    Set objRegExpURL = New GAUG_RegExp
     'sets the pattern to match every URL in the bibliography (http, https or ftp)
-    objRegExpURL.Pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
+    objRegExpURL.pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
     'sets case insensitivity
-    objRegExpURL.IgnoreCase = False
+    objRegExpURL.ignoreCase = False
     'sets global applicability
-    objRegExpURL.Global = True
+    objRegExpURL.GlobalSearch = True
 
     'initializes the flag
     blnBibliographyFound = False
@@ -1431,89 +1456,87 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             objCurrentFieldOrContentControl.range.Select
                     End Select
 
-                    'checks that the string can be compared
-                    If objRegExpBibliographyFullEntries.Test(Selection) Then
-                        'gets the matches (all full entries in bibliography according to the regular expression)
-                        Set colMatchesBibliographyFullEntries = objRegExpBibliographyFullEntries.Execute(Selection)
+                    'separates the bibliography in individual full entries
+                    strBibliographyFullEntries = Split(Selection, Chr(13))
 
-                        'creates an array for the matches in the bibliography that will have a bookmark
-                        ReDim arrStrBookmarksInBilbiography(1 To colMatchesBibliographyFullEntries.Count)
+                    'creates an array for the matches in the bibliography that will have a bookmark
+                    ReDim arrStrBookmarksInBibliography(1 To UBound(strBibliographyFullEntries) - LBound(strBibliographyFullEntries) + 1)
 
-                        'treats all matches (all full entries in bibliography) to generate bookmarks
-                        For Each objMatchBibliographyFullEntry In colMatchesBibliographyFullEntries
-                            'checks that the string can be compared
-                            If objRegExpBibliographyEntries.Test(objMatchBibliographyFullEntry.value) Then
-                                'gets the matches (the single entry according to the regular expression)
-                                Set colMatchesBibliographyEntries = objRegExpBibliographyEntries.Execute(objMatchBibliographyFullEntry.value)
 
-                                'if a match was found in this bibliograpy full entry (there should always be only one)
-                                If colMatchesBibliographyEntries.Count = 1 Then
-                                    'treats all matches (should be only one) to generate bookmarks
-                                    '(we have to find AGAIN every entry to select it and create the bookmark)
-                                    For Each objMatchBibliographyEntry In colMatchesBibliographyEntries
-                                        'removes the carriage return from match, if necessary
-                                        strTempMatch = Replace(objMatchBibliographyEntry.value, Chr(13), "")
-    
-                                        'prevents errors if the match is longer than 256 characters
-                                        'however, the reference will not be linked if it has more than 20 authors (APA 7th edition)
-                                        'or more than 7 authors (APA 6th edition) due to the fact that APA replaces some of them with ellipsis (...)
-                                        strSubStringOfTempMatch = Left(strTempMatch, 256)
-    
-                                        'according to the version of Mendeley
-                                        Select Case intAvailableMendeleyVersion
-                                            'Mendeley Desktop 1.x is installed
-                                            Case 1
-                                                'selects the current field (Mendeley's bibliography field)
-                                                objCurrentFieldOrContentControl.Select
-                                            'Mendeley Reference Manager 2.x is installed
-                                            Case 2
-                                                'selects the current content control (Mendeley's bibliography content control)
-                                                objCurrentFieldOrContentControl.range.Select
-                                        End Select
-    
-                                        'finds and selects the text of the current reference
+                    'treats all matches (all full entries in bibliography) to generate bookmarks
+                    For lngCurrentBibliographyFullEntry = LBound(strBibliographyFullEntries) To UBound(strBibliographyFullEntries)
+                        'checks that the string can be compared
+                        If objRegExpBibliographyEntries.Test(strBibliographyFullEntries(lngCurrentBibliographyFullEntry)) Then
+                            'gets the matches (the single entry according to the regular expression)
+                            Set colMatchesBibliographyEntries = objRegExpBibliographyEntries.Execute(strBibliographyFullEntries(lngCurrentBibliographyFullEntry))
+
+                            'if a match was found in this bibliography full entry (there should always be only one)
+                            If colMatchesBibliographyEntries.Count = 1 Then
+                                'treats all matches (should be only one) to generate bookmarks
+                                '(we have to find AGAIN every entry to select it and create the bookmark)
+                                For Each objMatchBibliographyEntry In colMatchesBibliographyEntries
+                                    'removes the carriage return from match, if necessary
+                                    strTempMatch = Replace(objMatchBibliographyEntry.value, Chr(13), "")
+
+                                    'prevents errors if the match is longer than 256 characters
+                                    'however, the reference will not be linked if it has more than 20 authors (APA 7th edition)
+                                    'or more than 7 authors (APA 6th edition) due to the fact that APA replaces some of them with ellipsis (...)
+                                    strSubStringOfTempMatch = Left(strTempMatch, 256)
+
+                                    'according to the version of Mendeley
+                                    Select Case intAvailableMendeleyVersion
+                                        'Mendeley Desktop 1.x is installed
+                                        Case 1
+                                            'selects the current field (Mendeley's bibliography field)
+                                            objCurrentFieldOrContentControl.Select
+                                        'Mendeley Reference Manager 2.x is installed
+                                        Case 2
+                                            'selects the current content control (Mendeley's bibliography content control)
+                                            objCurrentFieldOrContentControl.range.Select
+                                    End Select
+
+                                    'finds and selects the text of the current reference
+                                    blnReferenceEntryFound = False
+                                    With Selection.Find
+                                        .Forward = True
+                                        .Wrap = wdFindStop
+                                        .Text = strSubStringOfTempMatch
+                                        .Execute
+                                        blnReferenceEntryFound = .found
+                                    End With
+
+                                    'moves the selection, if necessary, to include the full match
+                                    Selection.MoveEnd Unit:=wdCharacter, Count:=Len(strTempMatch) - Len(strSubStringOfTempMatch)
+
+                                    'checks that the full match is found
+                                    If Selection.Text = strTempMatch Then
+                                        blnReferenceEntryFound = True
+                                    Else
+                                        'there is no more searching, the reference will not be linked in this case
                                         blnReferenceEntryFound = False
-                                        With Selection.Find
-                                            .Forward = True
-                                            .Wrap = wdFindStop
-                                            .Text = strSubStringOfTempMatch
-                                            .Execute
-                                            blnReferenceEntryFound = .found
-                                        End With
-    
-                                        'moves the selection, if necessary, to include the full match
-                                        Selection.MoveEnd Unit:=wdCharacter, Count:=Len(strTempMatch) - Len(strSubStringOfTempMatch)
-    
-                                        'checks that the full match is found
-                                        If Selection.Text = strTempMatch Then
-                                            blnReferenceEntryFound = True
-                                        Else
-                                            'there is no more searching, the reference will not be linked in this case
-                                            blnReferenceEntryFound = False
-                                        End If
-    
-                                        'if a match was found (it shall always find it, but good practice)
-                                        'creates the bookmark with the selected text
-                                        If blnReferenceEntryFound Then
-                                            'creates the bookmark
-                                            Selection.Bookmarks.Add _
-                                                Name:="GAUG_SignetBibliographie_" & format(CStr(intReferenceNumber), "00#"), _
-                                                range:=Selection.range
-                                            'adds the entry to the lists of bookmarks, to be used later when linking the citations to the bibliography
-                                            arrStrBookmarksInBilbiography(intReferenceNumber) = Selection.range.Text
-                                        End If
-    
-                                        'continues with the next number
-                                        intReferenceNumber = intReferenceNumber + 1
-    
-                                    Next 'treats all matches (all entries in bibliography) to generate bookmarks
-                                End If 'if a match was found in this bibliograpy full entry (there should always be only one)
-                            End If 'checks that the string can be compared
-                        Next objMatchBibliographyFullEntry
-                    End If 'checks that the string can be compared
+                                    End If
+
+                                    'if a match was found (it shall always find it, but good practice)
+                                    'creates the bookmark with the selected text
+                                    If blnReferenceEntryFound Then
+                                        'creates the bookmark
+                                        Selection.Bookmarks.Add _
+                                            name:="GAUG_SignetBibliographie_" & format(CStr(intReferenceNumber), "00#"), _
+                                            range:=Selection.range
+                                        'adds the entry to the lists of bookmarks, to be used later when linking the citations to the bibliography
+                                        arrStrBookmarksInBibliography(intReferenceNumber) = Selection.range.Text
+                                    End If
+
+                                    'continues with the next number
+                                    intReferenceNumber = intReferenceNumber + 1
+
+                                Next 'treats all matches (all entries in bibliography) to generate bookmarks
+                            End If 'if a match was found in this bibliography full entry (there should always be only one)
+                        End If 'checks that the string can be compared
+                    Next 'treats all matches (all full entries in bibliography) to generate bookmarks
 
 
-                    'by now, we have created all bookmarks and have all entries in arrStrBookmarksInBilbiography
+                    'by now, we have created all bookmarks and have all entries in arrStrBookmarksInBibliography
                     'for future use when creating the hyperlinks
 
                     'generates the hyperlinks for the URLs in the bibliography, if required
@@ -1568,21 +1591,21 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 '*   Linking the bookmarks   *
 '*****************************
     'creates the objects for regular expressions (to get all entries in current citation and position of citation entry in bibliography)
-    Set objRegExpVisibleCitationItems = CreateObject("VBScript.RegExp")
-    Set objRegExpFindBibliographyEntry = CreateObject("VBScript.RegExp")
-    Set objRegExpFindVisibleCitationItem = CreateObject("VBScript.RegExp")
+    Set objRegExpVisibleCitationItems = New GAUG_RegExp
+    Set objRegExpFindBibliographyEntry = New GAUG_RegExp
+    Set objRegExpFindVisibleCitationItem = New GAUG_RegExp
     'sets the pattern to match every citation entry (with or without authors) in the visible text of the current field or content control
     '(the year of publication is always present, authors may not be)
     '(all text non starting by "(" or "," or ";" followed by non digits until a year is found)
-    objRegExpVisibleCitationItems.Pattern = "[^(\(|,|;)][^0-9]*\d\d\d\d[a-zA-Z]?"
+    objRegExpVisibleCitationItems.pattern = "[^(\(|,|;)][^0-9]*\d\d\d\d[a-zA-Z]?"
     'sets case insensitivity
-    objRegExpVisibleCitationItems.IgnoreCase = False
-    objRegExpFindBibliographyEntry.IgnoreCase = False
-    objRegExpFindVisibleCitationItem.IgnoreCase = False
+    objRegExpVisibleCitationItems.ignoreCase = False
+    objRegExpFindBibliographyEntry.ignoreCase = False
+    objRegExpFindVisibleCitationItem.ignoreCase = False
     'sets global applicability
-    objRegExpVisibleCitationItems.Global = True
-    objRegExpFindBibliographyEntry.Global = True
-    objRegExpFindVisibleCitationItem.Global = True
+    objRegExpVisibleCitationItems.GlobalSearch = True
+    objRegExpFindBibliographyEntry.GlobalSearch = True
+    objRegExpFindVisibleCitationItem.GlobalSearch = True
 
     strOrphanCitationItems = ""
 
@@ -1674,65 +1697,65 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             'treats all citation items from the citation full information (to find which one corresponds to the current visible citation item being treated)
                             For intCitationItemFromCitationFullInfo = 1 To UBound(varCitationItemsFromCitationFullInfo)
                                 'gets the list of authors (if available) from the citation item
-                                varAuthorsFomCitationItem = GAUG_getAuthorsEditorsFromCitationItem(intAvailableMendeleyVersion, "author", varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
+                                varAuthorsFromCitationItem = GAUG_getAuthorsEditorsFromCitationItem(intAvailableMendeleyVersion, "author", varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
                                 'gets the list of editors (if available) from the citation item
-                                varEditorsFomCitationItem = GAUG_getAuthorsEditorsFromCitationItem(intAvailableMendeleyVersion, "editor", varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
+                                varEditorsFromCitationItem = GAUG_getAuthorsEditorsFromCitationItem(intAvailableMendeleyVersion, "editor", varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
                                 'gets the year of issue from the citation item
-                                varYearFomCitationItem = GAUG_getYearFromCitationItem(intAvailableMendeleyVersion, varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
+                                varYearFromCitationItem = GAUG_getYearFromCitationItem(intAvailableMendeleyVersion, varCitationItemsFromCitationFullInfo(intCitationItemFromCitationFullInfo))
 
                                 'initializes the regular expressions
-                                objRegExpFindBibliographyEntry.Pattern = ""
-                                objRegExpFindVisibleCitationItem.Pattern = ""
+                                objRegExpFindBibliographyEntry.pattern = ""
+                                objRegExpFindVisibleCitationItem.pattern = ""
 
                                 'if the citation item has authors (instead of editors)
-                                If Not Not varAuthorsFomCitationItem Then
-                                    For intAuthorFromCitationItem = 1 To UBound(varAuthorsFomCitationItem)
+                                If Not Not varAuthorsFromCitationItem Then
+                                    For intAuthorFromCitationItem = 1 To UBound(varAuthorsFromCitationItem)
                                         'gets the last name of the author and adds it to the regular expression (used to find the entry in the bibliography)
-                                        objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFomCitationItem(intAuthorFromCitationItem)) & ".*"
+                                        objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFromCitationItem(intAuthorFromCitationItem)) & ".*"
                                         'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
-                                        objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFomCitationItem(intAuthorFromCitationItem)) & ".*"
+                                        objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFromCitationItem(intAuthorFromCitationItem)) & ".*"
                                         'if this is the first author of many, this could be the only one listed, and the rest as "et al."
-                                        If intAuthorFromCitationItem = 1 And UBound(varAuthorsFomCitationItem) > 1 Then
+                                        If intAuthorFromCitationItem = 1 And UBound(varAuthorsFromCitationItem) > 1 Then
                                             'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
-                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "((et al\..*)|("
+                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "((et al\..*)|("
                                         End If
                                     Next
                                     'closes the parenthesis in the pattern if more than one author
-                                    If UBound(varAuthorsFomCitationItem) > 1 Then
-                                        objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "))"
+                                    If UBound(varAuthorsFromCitationItem) > 1 Then
+                                        objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "))"
                                     End If
 
                                 'but if no authors were found (like with a book with only editors), we use editors instead
                                 Else
                                     'if the citation item has editors
-                                    If Not Not varEditorsFomCitationItem Then
-                                        For intEditorFromCitationItem = 1 To UBound(varEditorsFomCitationItem)
+                                    If Not Not varEditorsFromCitationItem Then
+                                        For intEditorFromCitationItem = 1 To UBound(varEditorsFromCitationItem)
                                             'gets the last name of the editor and adds it to the regular expression (used to find the entry in the bibliography)
-                                            objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFomCitationItem(intEditorFromCitationItem)) & ".*"
+                                            objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFromCitationItem(intEditorFromCitationItem)) & ".*"
                                             'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
-                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFomCitationItem(intEditorFromCitationItem)) & ".*"
+                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFromCitationItem(intEditorFromCitationItem)) & ".*"
                                             'if this is the first editor of many, this could be the only one listed, and the rest as "et al."
-                                            If intEditorFromCitationItem = 1 And UBound(varEditorsFomCitationItem) > 1 Then
+                                            If intEditorFromCitationItem = 1 And UBound(varEditorsFromCitationItem) > 1 Then
                                                 'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
-                                                objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "((et al\..*)|("
+                                                objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "((et al\..*)|("
                                             End If
                                         Next
                                         'because the citation has editors, we make sure the text '(Eds.)' or '(Ed.)' is present in the bibliography
-                                        objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & "\(Eds?\.\)\.\s*"
+                                        objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & "\(Eds?\.\)\.\s*"
                                         'closes the parenthesis in the pattern if more than one editor
-                                        If UBound(varEditorsFomCitationItem) > 1 Then
-                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & "))"
+                                        If UBound(varEditorsFromCitationItem) > 1 Then
+                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "))"
                                         End If
                                     End If
                                 End If
 
                                 'finishes the patterns including the year and the letter shown in the visible citation item
-                                objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & varYearFomCitationItem & varPartsFromVisibleCitationItem(3)
-                                objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & "\(" & varYearFomCitationItem & varPartsFromVisibleCitationItem(3) & "\)"
+                                objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & varYearFromCitationItem & varPartsFromVisibleCitationItem(3)
+                                objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & "\(" & varYearFromCitationItem & varPartsFromVisibleCitationItem(3) & "\)"
                                 'MsgBox objMatchVisibleCitationItem.value & " -> *" & _
                                 '    varPartsFromVisibleCitationItem(1) & "*" & varPartsFromVisibleCitationItem(2) & "*" & varPartsFromVisibleCitationItem(3) & "*" & vbCrLf & vbCrLf & _
-                                '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & vbCrLf & _
-                                '    objRegExpFindBibliographyEntry.Pattern
+                                '    objRegExpFindVisibleCitationItem.pattern & vbCrLf & vbCrLf & _
+                                '    objRegExpFindBibliographyEntry.pattern
 
                                 'if the current visible citation item has authors's family names (not only the year)
                                 If Len(varPartsFromVisibleCitationItem(1)) > 0 Then
@@ -1757,7 +1780,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         'to the visible citation item being treated and not because the for loop reached the end
                         If colMatchesFindVisibleCitationItem.Count = 0 Then
                             'cleans the regular expression as no matches were found
-                            objRegExpFindBibliographyEntry.Pattern = "Error: Citation not found"
+                            objRegExpFindBibliographyEntry.pattern = "Error: Citation not found"
                         End If
 
                         'at this point, the regular expression to find the entry in the bibliography is ready
@@ -1766,18 +1789,18 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         'MsgBox "The visible citation item" & vbCrLf & _
                         '    objMatchVisibleCitationItem.value & vbCrLf & _
                         '    "matches:" & vbCrLf & vbCrLf & _
-                        '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & _
-                        '    objRegExpFindBibliographyEntry.Pattern
+                        '    objRegExpFindVisibleCitationItem.pattern & vbCrLf & _
+                        '    objRegExpFindBibliographyEntry.pattern
 
                         'initializes the position
                         intReferenceNumber = 1
                         'finds the position of the citation entry in the list of references in the bibliography
                         blnReferenceEntryFound = False
-                        For Each strBookmarksInBilbiography In arrStrBookmarksInBilbiography
-                            'MsgBox ("Searching for citation in bibliography:" & vbCrLf & vbCrLf & "Using..." & vbCrLf & objRegExpFindBibliographyEntry.Pattern & vbCrLf & strBookmarksInBilbiography)
+                        For Each strBookmarkInBibliography In arrStrBookmarksInBibliography
+                            'MsgBox ("Searching for citation in bibliography:" & vbCrLf & vbCrLf & "Using..." & vbCrLf & objRegExpFindBibliographyEntry.pattern & vbCrLf & strBookmarkInBibliography)
                             'gets the matches, if any, to check if this reference entry corresponds to the visible citation item being treated
-                            Set colMatchesFindBibliographyEntry = objRegExpFindBibliographyEntry.Execute(strBookmarksInBilbiography)
-                            'if the this is the corresponding reference entry
+                            Set colMatchesFindBibliographyEntry = objRegExpFindBibliographyEntry.Execute(CStr(strBookmarkInBibliography))
+                            'if this is the corresponding reference entry
                             'Verify for MabEntwickeltSich: perhaps a more strict verification is needed
                             If colMatchesFindBibliographyEntry.Count > 0 Then
                                 blnReferenceEntryFound = True
@@ -1899,7 +1922,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     Dim intAvailableMendeleyVersion, intUseMendeleyVersion As Integer
     Dim documentSection As Section
     Dim sectionField As Field
-    Dim blnFound, blnBibliographyFound, blnReferenceNumberFound, blnCitationNumberFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
+    Dim blnFound, blnCitationFound, blnBibliographyFound, blnReferenceNumberFound, blnCitationNumberFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
     Dim intReferenceNumber, intCitationNumber As Integer
     Dim objRegExpVisibleCitationItems, objRegExpURL As Object
     Dim colMatchesVisibleCitationItems, colMatchesURL As Object
@@ -2023,13 +2046,13 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*   Creation of bookmarks   *
 '*****************************
     'creates the object for regular expressions (to get all URLs in bibliography)
-    Set objRegExpURL = CreateObject("VBScript.RegExp")
+    Set objRegExpURL = New GAUG_RegExp
     'sets the pattern to match every URL in the bibliography (http, https or ftp)
-    objRegExpURL.Pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
+    objRegExpURL.pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
     'sets case insensitivity
-    objRegExpURL.IgnoreCase = False
+    objRegExpURL.ignoreCase = False
     'sets global applicability
-    objRegExpURL.Global = True
+    objRegExpURL.GlobalSearch = True
 
     'initializes the flag
     blnBibliographyFound = False
@@ -2130,7 +2153,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 
                             'creates the bookmark
                             Selection.Bookmarks.Add _
-                                Name:="GAUG_SignetBibliographie_" & format(CStr(intReferenceNumber), "00#"), _
+                                name:="GAUG_SignetBibliographie_" & format(CStr(intReferenceNumber), "00#"), _
                                 range:=Selection.range
                         End If
 
@@ -2195,14 +2218,14 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*   Linking the bookmarks   *
 '*****************************
     'creates the object for regular expressions (to get all entries in current citation)
-    Set objRegExpVisibleCitationItems = CreateObject("VBScript.RegExp")
+    Set objRegExpVisibleCitationItems = New GAUG_RegExp
     'sets the pattern to match every citation entry in the visible text of the current field or content control
     'it should be "[" + Number + "]"
-    objRegExpVisibleCitationItems.Pattern = "\[[0-9]+\]"
+    objRegExpVisibleCitationItems.pattern = "\[[0-9]+\]"
     'sets case insensitivity
-    objRegExpVisibleCitationItems.IgnoreCase = False
+    objRegExpVisibleCitationItems.ignoreCase = False
     'sets global applicability
-    objRegExpVisibleCitationItems.Global = True
+    objRegExpVisibleCitationItems.GlobalSearch = True
 
     strOrphanCitationItems = ""
 
@@ -2457,7 +2480,7 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
     Dim fieldBookmark As Bookmark
     Dim selectionHyperlinks As Hyperlinks
     Dim i As Integer
-    Dim blnFound, blnBibliographyFound As Boolean
+    Dim blnFound, blnCitationFound, blnBibliographyFound As Boolean
     Dim sectionFieldName, sectionFieldNewName As String
     Dim objMendeleyApiClient As Object
     Dim cbbUndoEditButton As CommandBarButton
@@ -2467,6 +2490,8 @@ Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As Strin
     Dim blnStyleForTitleOfBibliographyFound As Boolean
     Dim varFieldsOrContentControls As Variant
     Dim currentPosition As range
+    'Const INSERT_CITATION_TEXT = "{Formatting Citation}" 'copied from Mendeley Desktop 1.x (from the MS Word plugin Mendeley Cite-O-Matic)
+    Const INSERT_CITATION_TEXT = vbNullString
 
 
 '*****************************
