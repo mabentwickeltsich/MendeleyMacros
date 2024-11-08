@@ -136,7 +136,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-16                                                                                                                **
+'**  Last modified: 2024-10-21                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getMendeleyWebExtensionXMLFileContents()                                                                                   **
 '**                                                                                                                                           **
@@ -152,7 +152,7 @@ End Function
 '***********************************************************************************************************************************************
 Function GAUG_getMendeleyWebExtensionXMLFileContents()
 
-    Dim adoStream As ADODB.Stream
+    Dim adoStream As Object
     Dim strDocumentName As String
     Dim strDocumentPath As String
     Dim strDocumentFullName As String
@@ -167,10 +167,30 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
     Dim objZipAsFolder As Object
 
 
+    'sets error handling for testing if object ADODB.Stream is available
+    On Error Resume Next
+    'creates an ADODB.Stream object (used to read the UTF-8 XML files)
+    Set adoStream = CreateObject("ADODB.Stream")
+    'checks if the object ADODB.Stream was succesfully created
+    If Err.Number <> 0 Then
+        'The reference to 'Microsoft ActiveX Data Objects 6.1 Library' has not been added, object ADODB.Stream is not available
+        '(the reference is automatically added, this error just means that object ADODB.Stream was not created)
+        MsgBox "Your document exceeds the maximum number of citations." & vbCrLf & vbCrLf & _
+            "ADODB.Stream is necessary in this extreme case." & vbCrLf & _
+            "Enable the ADODB object and try again." & vbCrLf & vbCrLf & _
+            "Cannot continue creating hyperlinks.", _
+            vbCritical, "lateBinding()"
+
+        'stops the execution
+        End
+    End If
+    'sets back default error handling by VBA
+    On Error GoTo 0
+    
     'initializes the file system object
     Set objFileSystem = CreateObject("Scripting.FileSystemObject")
     'initializes the stream (used to read the UTF-8 XML files)
-    Set adoStream = New ADODB.Stream
+    'Set adoStream = New ADODB.Stream
     adoStream.Charset = "UTF-8"
     'initializes the string that will hold the the contents of the file 'webextension<number>.xml' that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
     strXMLFileContents = ""
@@ -255,7 +275,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-16                                                                                                                **
+'**  Last modified: 2024-10-21                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getAllCitationsFullInformation(intMendeleyVersion As Integer) As String                                                    **
 '**                                                                                                                                           **
@@ -319,11 +339,18 @@ Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer
             'sets global applicability
             objRegExpWordOpenXMLCitations.Global = True
 
+            'sets error handling for testing if the instruction 'ActiveDocument.WordOpenXML' can return the full document
+            On Error Resume Next
             'gets the full XML of the document
-            'if file 'word\webextensions\webextension<number>.xml' is bigger than 1MB, the instruction 'ActiveDocument.WordOpenXML' fails
-            'better to directly read the file 'word\webextensions\webextension<number>.xml'
-            'strWordOpenXML = ActiveDocument.WordOpenXML
-            strWordOpenXML = GAUG_getMendeleyWebExtensionXMLFileContents()
+            strWordOpenXML = ActiveDocument.WordOpenXML
+            'checks if 'ActiveDocument.WordOpenXML' was succesful
+            If Err.Number <> 0 Then
+                'if file 'word\webextensions\webextension<number>.xml' is bigger than 1MB, the instruction 'ActiveDocument.WordOpenXML' fails
+                'better to directly read the file 'word\webextensions\webextension<number>.xml'
+                strWordOpenXML = GAUG_getMendeleyWebExtensionXMLFileContents()
+            End If
+            'sets back default error handling by VBA
+            On Error GoTo 0
 
             'checks that the string can be compared
             If objRegExpWordOpenXMLCitations.Test(strWordOpenXML) Then
@@ -1473,7 +1500,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                             Selection.Bookmarks.Add _
                                                 Name:="GAUG_SignetBibliographie_" & format(CStr(intReferenceNumber), "00#"), _
                                                 range:=Selection.range
-                                            'adds the entry to the lists of bookmarks
+                                            'adds the entry to the lists of bookmarks, to be used later when linking the citations to the bibliography
                                             arrStrBookmarksInBilbiography(intReferenceNumber) = Selection.range.Text
                                         End If
     
@@ -1487,7 +1514,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                     End If 'checks that the string can be compared
 
 
-                    'by now, we have created all bookmarks and have all entries in colMatchesBibliographyEntries
+                    'by now, we have created all bookmarks and have all entries in arrStrBookmarksInBilbiography
                     'for future use when creating the hyperlinks
 
                     'generates the hyperlinks for the URLs in the bibliography, if required
@@ -1707,10 +1734,6 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 '    varPartsFromVisibleCitationItem(1) & "*" & varPartsFromVisibleCitationItem(2) & "*" & varPartsFromVisibleCitationItem(3) & "*" & vbCrLf & vbCrLf & _
                                 '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & vbCrLf & _
                                 '    objRegExpFindBibliographyEntry.Pattern
-                                'ActiveDocument.Content.InsertAfter Text:=vbCrLf & vbCrLf & _
-                                '    objMatchVisibleCitationItem.value & vbCrLf & _
-                                '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & _
-                                '    objRegExpFindBibliographyEntry.Pattern & vbCrLf
 
                                 'if the current visible citation item has authors's family names (not only the year)
                                 If Len(varPartsFromVisibleCitationItem(1)) > 0 Then
@@ -1739,13 +1762,13 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         End If
 
                         'at this point, the regular expression to find the entry in the bibliography is ready
+                        'it is time to find the citation entry in the bibliography and link the current visible citation item
+
                         'MsgBox "The visible citation item" & vbCrLf & _
                         '    objMatchVisibleCitationItem.value & vbCrLf & _
                         '    "matches:" & vbCrLf & vbCrLf & _
                         '    objRegExpFindVisibleCitationItem.Pattern & vbCrLf & _
                         '    objRegExpFindBibliographyEntry.Pattern
-
-                        'it is time to find the citation entry in the bibliography and link the current visible citation item
 
                         'initializes the position
                         intReferenceNumber = 1
