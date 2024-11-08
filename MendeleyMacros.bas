@@ -136,7 +136,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-15                                                                                                                **
+'**  Last modified: 2024-10-16                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getMendeleyWebExtensionXMLFileContents()                                                                                   **
 '**                                                                                                                                           **
@@ -185,7 +185,6 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
 
         'builds the path for a temporary folder to unzip the document
         strTemporalFolder = Environ$("temp") & "\" & "MendeleyMacros_GAUG_temp"
-        'strTemporalFolder = strDocumentPath & "\" & "MendeleyMacros_GAUG_temp"
 
         'cleans up temporary folder if it exists
         If objFileSystem.FolderExists(strTemporalFolder) Then
@@ -221,10 +220,7 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
 
                     'checks if the file 'webextension<number>.xml' exists
                     If objFileSystem.FileExists(strWebExtensionXMLFullName) Then
-                        'opens the XML file for reading
-                        'Set objXMLFile = objFileSystem.OpenTextFile(strWebExtensionXMLFullName, 1)
-                        'strXMLFileContents = objXMLFile.ReadAll
-                        'objXMLFile.Close
+                        'opens the XML file, reads and closes it
                         adoStream.Open
                         adoStream.LoadFromFile strWebExtensionXMLFullName
                         strXMLFileContents = adoStream.ReadText
@@ -235,7 +231,7 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
                             'stops the search, we have the file
                             Exit For
                         Else
-                            'clears the contents of the string and continue searching for the file
+                            'clears the contents of the string and continues searching for the file
                             strXMLFileContents = ""
                         End If
                     End If 'checks if the file 'webextension<number>.xml' exists
@@ -259,7 +255,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-02                                                                                                                **
+'**  Last modified: 2024-10-16                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getAllCitationsFullInformation(intMendeleyVersion As Integer) As String                                                    **
 '**                                                                                                                                           **
@@ -324,6 +320,8 @@ Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer
             objRegExpWordOpenXMLCitations.Global = True
 
             'gets the full XML of the document
+            'if file 'word\webextensions\webextension<number>.xml' is bigger than 1MB, the instruction 'ActiveDocument.WordOpenXML' fails
+            'better to directly read the file 'word\webextensions\webextension<number>.xml'
             'strWordOpenXML = ActiveDocument.WordOpenXML
             strWordOpenXML = GAUG_getMendeleyWebExtensionXMLFileContents()
 
@@ -1275,7 +1273,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     'sets the pattern to match every reference entry in the bibliography (it may include a character of carriage return)
     '(all text from the beginning of the string, or carriage return, until a year between parentheses is found)
     'updated to include "(Ed.)" and "(Eds.)" when editors are used for the citations and bibliography
-    objRegExpBibliographyEntries.Pattern = "((^)|(\r))[^(\r)]*(\(Eds?\.\)\.\s*)?\(\d\d\d\d[a-zA-Z]?\)"
+    objRegExpBibliographyEntries.Pattern = "((^)|(\r))[^(\r)]*(\(Eds?\.\))?\.\s\(\d\d\d\d[a-zA-Z]?\)"
+    'NOT updated to include more "(<some text>)" in cases such as "United Nations (UN). (2024)...", this brakes the regular expression (needs a better approach)
+    'objRegExpBibliographyEntries.Pattern = "((^)|(\r))([^(\r)]*(\([a-zA-Z\s]*\))*)*(\(Eds?\.\))?\.\s\(\d\d\d\d[a-zA-Z]?\)"
     'sets case insensitivity
     objRegExpBibliographyEntries.IgnoreCase = False
     'sets global applicability
@@ -1771,7 +1771,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     If Len(strOrphanCitationItems) > 0 Then
         MsgBox "Orphan citation entries found:" & vbCrLf & vbCrLf & _
             strOrphanCitationItems & vbCrLf & _
-            "Remove them from document!", _
+            "Remove them from the document or manually create the bookmarks and hyperlinks!", _
             vbExclamation, "GAUG_createHyperlinksForCitationsAPA()"
     End If
 
@@ -2309,7 +2309,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     If Len(strOrphanCitationItems) > 0 Then
         MsgBox "Orphan citation entries found:" & vbCrLf & vbCrLf & _
         strOrphanCitationItems & vbCrLf & _
-        "Remove them from document!", _
+        "Remove them from the document or manually create the bookmarks and hyperlinks!", _
         vbExclamation, "GAUG_createHyperlinksForCitationsIEEE()"
     End If
 
