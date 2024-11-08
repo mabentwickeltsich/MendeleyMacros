@@ -189,8 +189,7 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
     
     'initializes the file system object
     Set objFileSystem = CreateObject("Scripting.FileSystemObject")
-    'initializes the stream (used to read the UTF-8 XML files)
-    'Set adoStream = New ADODB.Stream
+
     adoStream.Charset = "UTF-8"
     'initializes the string that will hold the the contents of the file 'webextension<number>.xml' that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
     strXMLFileContents = ""
@@ -295,9 +294,9 @@ End Function
 '***********************************************************************************************************************************************
 Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer) As String
 
-    Dim objRegExpWordOpenXMLCitations As RegExp
-    Dim colMatchesWordOpenXMLCitations As MatchCollection
-    Dim objMatchWordOpenXMLCitations As match
+    Dim objRegExpWordOpenXMLCitations As Object
+    Dim colMatchesWordOpenXMLCitations As Object
+    Dim objMatchWordOpenXMLCitations As Object
     Dim strAllCitationsFullInformation As String
     Dim blnFound As Boolean
 
@@ -327,7 +326,7 @@ Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer
 
         'Mendeley Reference Manager 2.x is installed
         Case 2
-            Set objRegExpWordOpenXMLCitations = New RegExp
+            Set objRegExpWordOpenXMLCitations = CreateObject("VBScript.RegExp")
             'ActiveDocument.WordOpenXML contains everything on the document, including hidden information about the citations added by Mendeley's plugin
             'we need that hidden information to be able to match every citation to the corresponding entry in the bibliography
             '(the information is stored as one block of data within WordOpenXML)
@@ -415,9 +414,9 @@ End Function
 '***********************************************************************************************************************************************
 Function GAUG_getCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal strAllCitationsFullInformation As String, ByVal fldCitation As Field, ByVal ccCitation As ContentControl) As String
 
-    Dim objRegExpVisibleCitationItems As RegExp
-    Dim colMatchesVisibleCitationItems As MatchCollection
-    Dim objMatchVisibleCitationItem As match
+    Dim objRegExpVisibleCitationItems As Object
+    Dim colMatchesVisibleCitationItems As Object
+    Dim objMatchVisibleCitationItem As Object
     Dim strCitationFullInfo As String
     Dim blnFound As Boolean
 
@@ -454,7 +453,7 @@ Function GAUG_getCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal str
             'if the citation's content control is not empty
             If Not (ccCitation Is Nothing) Then
                 'creates the object for regular expressions
-                Set objRegExpVisibleCitationItems = New RegExp
+                Set objRegExpVisibleCitationItems = CreateObject("VBScript.RegExp")
                 'sets the pattern to match everything from '"citationID":"MENDELEY_CITATION_' to (but not including) '"citationID":"MENDELEY_CITATION_' or to the end of the string
                 'this gets individual citations, then the correct one can be selected
                 objRegExpVisibleCitationItems.Pattern = "{\" & Chr(34) & "citationID\" & Chr(34) & ":\" & Chr(34) & "MENDELEY_CITATION_.+?(?=(({\" & Chr(34) & "citationID\" & Chr(34) & ":\" & Chr(34) & "MENDELEY_CITATION_)|($)))"
@@ -528,9 +527,9 @@ Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As I
     Dim varCitationItemsFromCitationFullInfo() As Variant
     Dim intTotalCitationItems As Integer
 
-    Dim objRegExpCitationItems As RegExp
-    Dim colMatchesCitationItems As MatchCollection
-    Dim objMatchVisibleCitationItemItem As match
+    Dim objRegExpCitationItems As Object
+    Dim colMatchesCitationItems As Object
+    Dim objMatchVisibleCitationItemItem As Object
 
 
     'if the argument is not within valid versions
@@ -548,7 +547,7 @@ Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As I
     'if the citation's full info is not empty
     If Not (strCitationFullInfo = "") Then
 
-        Set objRegExpCitationItems = New RegExp
+        Set objRegExpCitationItems = CreateObject("VBScript.RegExp")
         'sets case insensitivity
         objRegExpCitationItems.IgnoreCase = False
         'sets global applicability
@@ -630,9 +629,9 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
     Dim intTotalAuthorsEditorsFromCitationItem As Integer
     Dim strFamilyName As String
 
-    Dim objRegExpAuthorsFromCitationItem, objRegExpAuthorFamilyNamesFromCitationItem As RegExp
-    Dim colMatchesAuthorsFromCitationItem, colMatchesAuthorFamilyNamesFromCitationItem As MatchCollection
-    Dim objMatchAuthorFromCitationItem, objMatchAuthorFamilyNameFromCitationItem As match
+    Dim objRegExpAuthorsFromCitationItem, objRegExpAuthorFamilyNamesFromCitationItem As Object
+    Dim colMatchesAuthorsFromCitationItem, colMatchesAuthorFamilyNamesFromCitationItem As Object
+    Dim objMatchAuthorFromCitationItem, objMatchAuthorFamilyNameFromCitationItem As Object
 
 
     'if the argument is not within valid versions
@@ -661,7 +660,7 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
     'if the citation item's full info is not empty
     If Not (strCitationItem = "") Then
 
-        Set objRegExpAuthorsFromCitationItem = New RegExp
+        Set objRegExpAuthorsFromCitationItem = CreateObject("VBScript.RegExp")
         'sets case insensitivity
         objRegExpAuthorsFromCitationItem.IgnoreCase = False
         'sets global applicability
@@ -691,7 +690,7 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
             'treats all matches (there should be at most one match, zero when editors are listed instead of the authors)
             For Each objMatchAuthorFromCitationItem In colMatchesAuthorsFromCitationItem
 
-                Set objRegExpAuthorFamilyNamesFromCitationItem = New RegExp
+                Set objRegExpAuthorFamilyNamesFromCitationItem = CreateObject("VBScript.RegExp")
                 'sets case insensitivity
                 objRegExpAuthorFamilyNamesFromCitationItem.IgnoreCase = False
                 'sets global applicability
@@ -772,9 +771,9 @@ Function GAUG_getYearFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal
 
     Dim strYearFromCitationItem As String
 
-    Dim objRegExpYearFromCitationItem As RegExp
-    Dim colMatchesYearFromCitationItem As MatchCollection
-    Dim objMatchYearFromCitationItem As match
+    Dim objRegExpYearFromCitationItem As Object
+    Dim colMatchesYearFromCitationItem As Object
+    Dim objMatchYearFromCitationItem As Object
 
 
     'if the argument is not within valid versions
@@ -792,7 +791,7 @@ Function GAUG_getYearFromCitationItem(ByVal intMendeleyVersion As Integer, ByVal
     'if the citation item's full info is not empty
     If Not (strCitationItem = "") Then
 
-        Set objRegExpYearFromCitationItem = New RegExp
+        Set objRegExpYearFromCitationItem = CreateObject("VBScript.RegExp")
         'sets case insensitivity
         objRegExpYearFromCitationItem.IgnoreCase = False
         'sets global applicability
@@ -977,9 +976,9 @@ End Function
 Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As Integer, ByVal fldBibliography As Field, ByVal ccBibliography As ContentControl, arrNonDetectedURLs() As Variant) As Integer
 
     Dim blnURLFound As Boolean
-    Dim objRegExpURL As RegExp
-    Dim colMatchesURL As MatchCollection
-    Dim objMatchURL As match
+    Dim objRegExpURL As Object
+    Dim colMatchesURL As Object
+    Dim objMatchURL As Object
     Dim strURL, strSubStringOfURL As String
     Dim varNonDetectedURL As Variant
     Dim objCurrentFieldOrContentControl As Object
@@ -999,7 +998,7 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
 
 
     'creates the object for regular expressions (to get all URLs in bibliography)
-    Set objRegExpURL = New RegExp
+    Set objRegExpURL = CreateObject("VBScript.RegExp")
     'sets the pattern to match every URL in the bibliography (http, https or ftp)
     objRegExpURL.Pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
     'sets case insensitivity
@@ -1205,9 +1204,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim documentSection As Section
     Dim blnFound, blnBibliographyFound, blnCitationFound, blnReferenceEntryFound, blnCitationEntryFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
     Dim intReferenceNumber As Integer
-    Dim objRegExpBibliographyEntries, objRegExpBibliographyFullEntries, objRegExpVisibleCitationItems, objRegExpFindBibliographyEntry, objRegExpFindVisibleCitationItem, objRegExpURL As RegExp
-    Dim colMatchesBibliographyEntries, colMatchesBibliographyFullEntries, colMatchesVisibleCitationItems, colMatchesFindBibliographyEntry, colMatchesFindVisibleCitationItem, colMatchesURL As MatchCollection
-    Dim objMatchBibliographyEntry, objMatchBibliographyFullEntry, objMatchVisibleCitationItem, objMatchFindBibliographyEntry, objMatchURL As match
+    Dim objRegExpBibliographyEntries, objRegExpBibliographyFullEntries, objRegExpVisibleCitationItems, objRegExpFindBibliographyEntry, objRegExpFindVisibleCitationItem, objRegExpURL As Object
+    Dim colMatchesBibliographyEntries, colMatchesBibliographyFullEntries, colMatchesVisibleCitationItems, colMatchesFindBibliographyEntry, colMatchesFindVisibleCitationItem, colMatchesURL As Object
+    Dim objMatchBibliographyEntry, objMatchBibliographyFullEntry, objMatchVisibleCitationItem, objMatchFindBibliographyEntry, objMatchURL As Object
     Dim strBookmarkInBibliography, arrStrBookmarksInBilbiography() As String
     Dim strTempMatch, strSubStringOfTempMatch, strLastAuthorsOrEditors As String
     Dim strTypeOfExecution As String
@@ -1333,7 +1332,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 '*   Creation of bookmarks   *
 '*****************************
     'creates the object for regular expressions (to get all full entries in bibliography)
-    Set objRegExpBibliographyFullEntries = New RegExp
+    Set objRegExpBibliographyFullEntries = CreateObject("VBScript.RegExp")
     'sets the pattern to match every reference full entry in the bibliography (from the first author until a new line is found)
     objRegExpBibliographyFullEntries.Pattern = "((^)|(\r)).+?(?=((\r)|($)))"
     'sets case insensitivity
@@ -1341,7 +1340,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     'sets global applicability
     objRegExpBibliographyFullEntries.Global = True
     'creates the object for regular expressions (to get the entry's text in the bibliography to create the bookmark)
-    Set objRegExpBibliographyEntries = New RegExp
+    Set objRegExpBibliographyEntries = CreateObject("VBScript.RegExp")
     'sets the pattern to match the reference entry
     '(all text from the beginning of the string until a year between parentheses is found)
     objRegExpBibliographyEntries.Pattern = "^.*\.\s\(\d\d\d\d[a-zA-Z]?\)"
@@ -1350,7 +1349,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     'sets global applicability
     objRegExpBibliographyEntries.Global = True
     'creates the object for regular expressions (to get all URLs in bibliography)
-    Set objRegExpURL = New RegExp
+    Set objRegExpURL = CreateObject("VBScript.RegExp")
     'sets the pattern to match every URL in the bibliography (http, https or ftp)
     objRegExpURL.Pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
     'sets case insensitivity
@@ -1569,9 +1568,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 '*   Linking the bookmarks   *
 '*****************************
     'creates the objects for regular expressions (to get all entries in current citation and position of citation entry in bibliography)
-    Set objRegExpVisibleCitationItems = New RegExp
-    Set objRegExpFindBibliographyEntry = New RegExp
-    Set objRegExpFindVisibleCitationItem = New RegExp
+    Set objRegExpVisibleCitationItems = CreateObject("VBScript.RegExp")
+    Set objRegExpFindBibliographyEntry = CreateObject("VBScript.RegExp")
+    Set objRegExpFindVisibleCitationItem = CreateObject("VBScript.RegExp")
     'sets the pattern to match every citation entry (with or without authors) in the visible text of the current field or content control
     '(the year of publication is always present, authors may not be)
     '(all text non starting by "(" or "," or ";" followed by non digits until a year is found)
@@ -1902,9 +1901,9 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     Dim sectionField As Field
     Dim blnFound, blnBibliographyFound, blnReferenceNumberFound, blnCitationNumberFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
     Dim intReferenceNumber, intCitationNumber As Integer
-    Dim objRegExpVisibleCitationItems, objRegExpURL As RegExp
-    Dim colMatchesVisibleCitationItems, colMatchesURL As MatchCollection
-    Dim objMatchVisibleCitationItem, objMatchURL As match
+    Dim objRegExpVisibleCitationItems, objRegExpURL As Object
+    Dim colMatchesVisibleCitationItems, colMatchesURL As Object
+    Dim objMatchVisibleCitationItem, objMatchURL As Object
     Dim blnIncludeSquareBracketsInHyperlinks As Boolean
     Dim strTypeOfExecution As String
     Dim blnMabEntwickeltSich As Boolean
@@ -2024,7 +2023,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*   Creation of bookmarks   *
 '*****************************
     'creates the object for regular expressions (to get all URLs in bibliography)
-    Set objRegExpURL = New RegExp
+    Set objRegExpURL = CreateObject("VBScript.RegExp")
     'sets the pattern to match every URL in the bibliography (http, https or ftp)
     objRegExpURL.Pattern = "((https?)|(ftp)):\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z0-9]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=\[\]\(\)<>;]*)"
     'sets case insensitivity
@@ -2196,7 +2195,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
 '*   Linking the bookmarks   *
 '*****************************
     'creates the object for regular expressions (to get all entries in current citation)
-    Set objRegExpVisibleCitationItems = New RegExp
+    Set objRegExpVisibleCitationItems = CreateObject("VBScript.RegExp")
     'sets the pattern to match every citation entry in the visible text of the current field or content control
     'it should be "[" + Number + "]"
     objRegExpVisibleCitationItems.Pattern = "\[[0-9]+\]"
