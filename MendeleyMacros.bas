@@ -889,6 +889,42 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
+'**  Last modified: 2024-10-17                                                                                                                **
+'**                                                                                                                                           **
+'**  Function GAUG_getSafeStringForRegularExpressions(ByVal strOriginalString As String) As String                                            **
+'**                                                                                                                                           **
+'**  Replaces all instances of \.[]{}()<>*+-=!?^$| with the corresponding escaped character.                                                  **
+'**                                                                                                                                           **
+'**  Parameter strOriginalString is the original string                                                                                       **
+'**                                                                                                                                           **
+'**  RETURNS: The modified string after escaping the special characters.                                                                      **
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+Function GAUG_getSafeStringForRegularExpressions(ByVal strOriginalString As String) As String
+
+    Dim arrSpecialCharacters(), strSpecialCharacter As Variant
+
+
+    'defines the special characters, "\" must be first, otherwise it will be escaped miltiple times
+    arrSpecialCharacters = Array("\", ".", "[", "]", "{", "}", "(", ")", "<", ">", "*", "+", "-", "=", "!", "?", "^", "$", "|")
+
+    'iterates over all characters in the original string
+    For Each strSpecialCharacter In arrSpecialCharacters
+        'escapes the current special character
+        strOriginalString = Replace(strOriginalString, strSpecialCharacter, "\" & strSpecialCharacter)
+    Next strSpecialCharacter
+
+
+    'returns the modified original string
+    GAUG_getSafeStringForRegularExpressions = strOriginalString
+
+End Function
+
+
+
+'***********************************************************************************************************************************************
+'***********************************************************************************************************************************************
+'**  Author: José Luis González García                                                                                                        **
 '**  Last modified: 2024-10-09                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As Integer, ByVal fldBibliography As Field,                 **
@@ -1626,9 +1662,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 If Not Not varAuthorsFomCitationItem Then
                                     For intAuthorFromCitationItem = 1 To UBound(varAuthorsFomCitationItem)
                                         'gets the last name of the author and adds it to the regular expression (used to find the entry in the bibliography)
-                                        objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & Replace(Replace(varAuthorsFomCitationItem(intAuthorFromCitationItem), "(", "."), ")", ".") & ".*"
+                                        objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFomCitationItem(intAuthorFromCitationItem)) & ".*"
                                         'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
-                                        objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & Replace(Replace(varAuthorsFomCitationItem(intAuthorFromCitationItem), "(", "."), ")", ".") & ".*"
+                                        objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFomCitationItem(intAuthorFromCitationItem)) & ".*"
                                         'if this is the first author of many, this could be the only one listed, and the rest as "et al."
                                         If intAuthorFromCitationItem = 1 And UBound(varAuthorsFomCitationItem) > 1 Then
                                             'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
@@ -1646,9 +1682,9 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     If Not Not varEditorsFomCitationItem Then
                                         For intEditorFromCitationItem = 1 To UBound(varEditorsFomCitationItem)
                                             'gets the last name of the editor and adds it to the regular expression (used to find the entry in the bibliography)
-                                            objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & Replace(Replace(varEditorsFomCitationItem(intEditorFromCitationItem), "(", "."), ")", ".") & ".*"
+                                            objRegExpFindBibliographyEntry.Pattern = objRegExpFindBibliographyEntry.Pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFomCitationItem(intEditorFromCitationItem)) & ".*"
                                             'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
-                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & Replace(Replace(varEditorsFomCitationItem(intEditorFromCitationItem), "(", "."), ")", ".") & ".*"
+                                            objRegExpFindVisibleCitationItem.Pattern = objRegExpFindVisibleCitationItem.Pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFomCitationItem(intEditorFromCitationItem)) & ".*"
                                             'if this is the first editor of many, this could be the only one listed, and the rest as "et al."
                                             If intEditorFromCitationItem = 1 And UBound(varEditorsFomCitationItem) > 1 Then
                                                 'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
