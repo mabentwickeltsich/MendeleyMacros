@@ -184,6 +184,7 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
 
 
         'if Mendeley Macros are running on macOS
+        '(checking for Mac because checking for Win32/Win64 is not reliable)
         #If Mac Then
         '#####On macOS - Start#####
 
@@ -246,6 +247,9 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
             Set adoStream = CreateObject("ADODB.Stream")
             'checks if the object ADODB.Stream was successfully created
             If Err.Number <> 0 Then
+                'sets back default error handling by VBA
+                On Error GoTo 0
+
                 'The reference to 'Microsoft ActiveX Data Objects 6.1 Library' has not been added, object ADODB.Stream is not available
                 '(the reference is automatically added, this error just means that object ADODB.Stream was not created)
                 MsgBox "Your document exceeds the maximum number of citations." & vbCrLf & vbCrLf & _
@@ -406,6 +410,9 @@ Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer
             strWordOpenXML = ActiveDocument.WordOpenXML
             'checks if 'ActiveDocument.WordOpenXML' was successful
             If Err.Number <> 0 Then
+                'sets back default error handling by VBA
+                On Error GoTo 0
+
                 'if file 'word\webextensions\webextension<number>.xml' is bigger than 1MB, the instruction 'ActiveDocument.WordOpenXML' fails
                 'better to directly read the file 'word\webextensions\webextension<number>.xml'
                 strWordOpenXML = GAUG_getMendeleyWebExtensionXMLFileContents()
@@ -722,9 +729,9 @@ Function GAUG_getAuthorsEditorsFromCitationItem(ByVal intMendeleyVersion As Inte
     Dim intTotalAuthorsEditorsFromCitationItem As Integer
     Dim strFamilyName As String
 
-    Dim objRegExpAuthorsFromCitationItem, objRegExpAuthorFamilyNamesFromCitationItem As Object
-    Dim colMatchesAuthorsFromCitationItem, colMatchesAuthorFamilyNamesFromCitationItem As Object
-    Dim objMatchAuthorFromCitationItem, objMatchAuthorFamilyNameFromCitationItem As Object
+    Dim objRegExpAuthorsFromCitationItem As Object, objRegExpAuthorFamilyNamesFromCitationItem As Object
+    Dim colMatchesAuthorsFromCitationItem As Object, colMatchesAuthorFamilyNamesFromCitationItem As Object
+    Dim objMatchAuthorFromCitationItem As Object, objMatchAuthorFamilyNameFromCitationItem As Object
 
 
     'if the argument is not within valid versions
@@ -1854,7 +1861,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     Set colMatchesFindVisibleCitationItem = objRegExpFindVisibleCitationItem.Execute(objMatchVisibleCitationItem.value)
                                 Else
                                     'checks if this item from the citation full information corresponds to the visible citation item being treated
-                                    Set colMatchesFindVisibleCitationItem = objRegExpFindVisibleCitationItem.Execute(strLastAuthorsOrEditors & ", " & objMatchVisibleCitationItem.value)
+                                    Set colMatchesFindVisibleCitationItem = objRegExpFindVisibleCitationItem.Execute(strLastAuthorsOrEditors & ", " & Trim(objMatchVisibleCitationItem.value))
                                 End If
 
                                 'if this item from the citation full information corresponds to the visible citation item being treated
@@ -1895,6 +1902,11 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                             'if this is the corresponding reference entry
                             'Verify for MabEntwickeltSich: perhaps a more strict verification is needed
                             If colMatchesFindBibliographyEntry.Count > 0 Then
+                                'ActiveDocument.Content.InsertAfter Text:=vbCrLf & _
+                                '    "(" & objMatchVisibleCitationItem.value & ")" & vbCrLf & _
+                                '    "/" & objRegExpFindVisibleCitationItem.pattern & "/ ---> " & vbCrLf & _
+                                '    "(" & colMatchesFindBibliographyEntry.Item(1).value & ")" & vbCrLf & _
+                                '    "/" & objRegExpFindBibliographyEntry.pattern & "/" & vbCrLf
                                 blnReferenceEntryFound = True
                                 Exit For
                             End If
