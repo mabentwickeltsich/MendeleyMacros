@@ -366,7 +366,7 @@ End Function
 Function GAUG_getAllCitationsFullInformation(ByVal intMendeleyVersion As Integer) As String
 
     Dim strWordOpenXML As String
-    Dim lngStartPosition, lngFirstPossibleEndPosition, lngSecondPossibleEndPosition As Long
+    Dim lngStartPosition As Long, lngFirstPossibleEndPosition As Long, lngSecondPossibleEndPosition As Long
     Dim strAllCitationsFullInformation As String
     Dim blnFound As Boolean
 
@@ -487,7 +487,7 @@ End Function
 '***********************************************************************************************************************************************
 Function GAUG_getCitationFullInfo(ByVal intMendeleyVersion As Integer, ByVal strAllCitationsFullInformation As String, ByVal fldCitation As Field, ByVal ccCitation As ContentControl) As String
 
-    Dim lngStartPositionOfCitation, lngEndPositionOfCitation, lngLengthOfCitation As Long
+    Dim lngStartPositionOfCitation As Long, lngEndPositionOfCitation As Long, lngLengthOfCitation As Long
     Dim strCitationFullInfo As String
     Dim blnFound As Boolean
 
@@ -600,7 +600,7 @@ Function GAUG_getCitationItemsFromCitationFullInfo(ByVal intMendeleyVersion As I
     Dim lngLengthOfCitationItem As Long
     Dim varCitationItemsPositionsFromCitationFullInfo() As Variant
     Dim varCitationItemsFromCitationFullInfo() As Variant
-    Dim i, intTotalCitationItems As Integer
+    Dim i As Integer, intTotalCitationItems As Integer
 
     Dim objRegExpCitationItems As Object
     Dim colMatchesCitationItems As Object
@@ -1021,7 +1021,7 @@ End Function
 '***********************************************************************************************************************************************
 Function GAUG_getSafeStringForRegularExpressions(ByVal strOriginalString As String) As String
 
-    Dim arrSpecialCharacters(), strSpecialCharacter As Variant
+    Dim arrSpecialCharacters() As Variant, strSpecialCharacter As Variant
 
 
     'defines the special characters, "\" must be first, otherwise it will be escaped multiple times
@@ -1072,7 +1072,7 @@ Function GAUG_createHyperlinksForURLsInBibliography(ByVal intMendeleyVersion As 
     Dim objRegExpURL As Object
     Dim colMatchesURL As Object
     Dim objMatchURL As Object
-    Dim strURL, strSubStringOfURL As String
+    Dim strURL As String, strSubStringOfURL As String
     Dim varNonDetectedURL As Variant
     Dim objCurrentFieldOrContentControl As Object
     Dim intTotalURLsWithoutHyperlink As Integer
@@ -1281,7 +1281,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-30                                                                                                                **
+'**  Last modified: 2024-11-04                                                                                                                **
 '**                                                                                                                                           **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                                                                               **
 '**                                                                                                                                           **
@@ -2028,22 +2028,22 @@ End Sub
 '***********************************************************************************************************************************************
 Sub GAUG_createHyperlinksForCitationsIEEE()
 
-    Dim intAvailableMendeleyVersion, intUseMendeleyVersion As Integer
+    Dim intAvailableMendeleyVersion As Integer, intUseMendeleyVersion As Integer
     Dim documentSection As Section
     Dim sectionField As Field
-    Dim blnFound, blnCitationFound, blnBibliographyFound, blnReferenceNumberFound, blnCitationNumberFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
-    Dim intReferenceNumber, intCitationNumber As Integer
-    Dim objRegExpVisibleCitationItems, objRegExpURL As Object
-    Dim colMatchesVisibleCitationItems, colMatchesURL As Object
-    Dim objMatchVisibleCitationItem, objMatchURL As Object
+    Dim blnFound As Boolean, blnCitationFound As Boolean, blnBibliographyFound As Boolean, blnReferenceNumberFound As Boolean, blnCitationNumberFound As Boolean, blnGenerateHyperlinksForURLs As Boolean, blnURLFound As Boolean
+    Dim intReferenceNumber As Integer, intCitationNumber As Integer
+    Dim objRegExpVisibleCitationItems As Object, objRegExpURL As Object
+    Dim colMatchesVisibleCitationItems As Object, colMatchesURL As Object
+    Dim objMatchVisibleCitationItem As Object, objMatchURL As Object
     Dim blnIncludeSquareBracketsInHyperlinks As Boolean
     Dim strTypeOfExecution As String
     Dim blnMabEntwickeltSich As Boolean
     Dim stlStyleInDocument As Word.Style
     Dim strStyleForTitleOfBibliography As String
     Dim blnStyleForTitleOfBibliographyFound As Boolean
-    Dim strURL, strSubStringOfURL As String
-    Dim arrNonDetectedURLs(), varNonDetectedURL As Variant
+    Dim strURL As String, strSubStringOfURL As String
+    Dim arrNonDetectedURLs() As Variant, varNonDetectedURL As Variant
     Dim strDoHyperlinksExist As String
     Dim objCurrentFieldOrContentControl As Object
     Dim strOrphanCitationItems As String
@@ -2583,14 +2583,14 @@ End Sub
 '***********************************************************************************************************************************************
 Sub GAUG_removeHyperlinksForCitations(Optional ByVal strTypeOfExecution As String = "RemoveHyperlinks")
 
-    Dim intAvailableMendeleyVersion, intUseMendeleyVersion As Integer
+    Dim intAvailableMendeleyVersion As Integer, intUseMendeleyVersion As Integer
     Dim documentSection As Section
     Dim objCurrentFieldOrContentControl As Object
     Dim fieldBookmark As Bookmark
     Dim selectionHyperlinks As Hyperlinks
     Dim i As Integer
-    Dim blnFound, blnCitationFound, blnBibliographyFound As Boolean
-    Dim sectionFieldName, sectionFieldNewName As String
+    Dim blnFound As Boolean, blnCitationFound As Boolean, blnBibliographyFound As Boolean
+    Dim sectionFieldName As String, sectionFieldNewName As String
     Dim objMendeleyApiClient As Object
     Dim cbbUndoEditButton As CommandBarButton
     Dim blnMabEntwickeltSich As Boolean
