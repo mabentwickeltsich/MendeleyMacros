@@ -2,6 +2,7 @@ Attribute VB_Name = "MendeleyMacros"
 Option Explicit
 
 
+
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
@@ -139,7 +140,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-23                                                                                                                **
+'**  Last modified: 2024-10-24                                                                                                                **
 '**                                                                                                                                           **
 '**  Function GAUG_getMendeleyWebExtensionXMLFileContents()                                                                                   **
 '**                                                                                                                                           **
@@ -159,8 +160,9 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
     Dim strDocumentPath As String
     Dim strDocumentFullName As String
     Dim strZipDocumentFullName As String
-    Dim strTemporalFolder As String
+    Dim strTemporaryFolder As String
     Dim strWebExtensionXMLFullName As String
+    Dim strCurrentXMLFile As String
     Dim objFileSystem As Object
     Dim objFile As Object
     Dim objXMLFile As Object
@@ -169,109 +171,169 @@ Function GAUG_getMendeleyWebExtensionXMLFileContents()
     Dim objZipAsFolder As Object
 
 
-    'sets error handling for testing if object ADODB.Stream is available
-    On Error Resume Next
-    'creates an ADODB.Stream object (used to read the UTF-8 XML files)
-    Set adoStream = CreateObject("ADODB.Stream")
-    'checks if the object ADODB.Stream was successfully created
-    If Err.Number <> 0 Then
-        'The reference to 'Microsoft ActiveX Data Objects 6.1 Library' has not been added, object ADODB.Stream is not available
-        '(the reference is automatically added, this error just means that object ADODB.Stream was not created)
-        '(or, this is running on macOS and the reference to 'Microsoft ActiveX Data Objects 6.1 Library' does not exist)
-        MsgBox "Your document exceeds the maximum number of citations." & vbCrLf & vbCrLf & _
-            "ADODB.Stream is necessary in this extreme case." & vbCrLf & _
-            "Enable the ADODB object and try again." & vbCrLf & vbCrLf & _
-            "If you are running the macros on macOS," & vbCrLf & _
-            "ADODB.Stream is not available for you." & vbCrLf & _
-            "However, removing the abstracts from all the entries" & vbCrLf & _
-            "in Mendeley Reference Manager 2.x may help." & vbCrLf & _
-            "Refresh the bibliography after removing the abstracts" & vbCrLf & _
-            "and try again." & vbCrLf & vbCrLf & _
-            "Cannot continue creating hyperlinks.", _
-            vbCritical, "lateBinding()"
-
-        'stops the execution
-        End
-    End If
-    'sets back default error handling by VBA
-    On Error GoTo 0
-    
-    'initializes the file system object
-    Set objFileSystem = CreateObject("Scripting.FileSystemObject")
-
-    adoStream.Charset = "UTF-8"
     'initializes the string that will hold the the contents of the file 'webextension<number>.xml' that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
     strXMLFileContents = ""
 
-
     'checks if the document has a file path (if it is saved)
+    '(it is not possible to extract its contents if the document is not saved)
     If ActiveDocument.Path <> "" Then
         'gets the name, path and full name of the active document
         strDocumentName = ActiveDocument.name
         strDocumentPath = ActiveDocument.Path
         strDocumentFullName = ActiveDocument.FullName
 
-        'builds the path for a temporary folder to unzip the document
-        strTemporalFolder = Environ$("temp") & "\" & "MendeleyMacros_GAUG_temp"
 
-        'cleans up temporary folder if it exists
-        If objFileSystem.FolderExists(strTemporalFolder) Then
-            objFileSystem.DeleteFolder strTemporalFolder, True
-        End If
+        'if Mendeley Macros are running on macOS
+        #If Mac Then
+        '#####On macOS - Start#####
 
-        'creates temporary folder
-        objFileSystem.CreateFolder strTemporalFolder
+            'MsgBox "On macOS"
 
-        'copies the .docx file and renames it to .zip
-        strZipDocumentFullName = strTemporalFolder & "\" & strDocumentName & ".zip"
-        objFileSystem.CopyFile strDocumentFullName, strZipDocumentFullName
+            'builds the path for a temporary folder to unzip the document
+            strTemporaryFolder = strDocumentPath & "/" & "MendeleyMacros_GAUG_temp"
 
-        'initializes the shell object
-        Set objShell = CreateObject("Shell.Application")
-        'opens the zip file (which is the .docx file)
-        Set objZipAsFolder = objShell.namespace(CVar(strZipDocumentFullName))
+            'extracts the zip file
+            '(AppleScriptTask can allow only one argument to the AppleScript handler, so we send "strDocumentFullName|strTemporaryFolder", later it will be separated)
+            If AppleScriptTask("MendeleyMacrosHelper_Mac.scpt", "unzipWordDocument", strDocumentFullName & "|" & strTemporaryFolder) <> "" Then
 
-        'if the zip file could be opened
-        If Not objZipAsFolder Is Nothing Then
-            'extracts the zip file (copies the files from the zip to the temporary folder without showing progress)
-            objShell.namespace(CVar(strTemporalFolder)).CopyHere objZipAsFolder.items, 4
+                'Microsoft Word may have several web extensions installed
+                'we need to find the file that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
 
-            'Microsoft Word may have several web extensions installed
-            'we need to find the file that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
+                'gets the first file name in folder 'word/webextensions/'
+                strCurrentXMLFile = Dir(strTemporaryFolder & "/word/webextensions/")
+                'iterates over all files in folder 'word/webextensions/'
+                Do While strCurrentXMLFile <> ""
+                    'if the file name starts with 'webextension' and finishes with '.xml'
+                    If (Left(strCurrentXMLFile, 12) = "webextension") And (Right(strCurrentXMLFile, 4) = ".xml") Then
+                        'creates the path to the 'webextension<number>.xml' file inside the unzipped folder
+                        strWebExtensionXMLFullName = strTemporaryFolder & "/word/webextensions/" & strCurrentXMLFile
 
-            'iterates over all files in folder 'word\webextensions\'
-            For Each objFile In objFileSystem.GetFolder(CVar(strTemporalFolder & "\" & "word\webextensions")).Files
-                'if the file name starts with 'webextension' and finishes with '.xml'
-                If (Left(objFile.name, 12) = "webextension") And (Right(objFile.name, 4) = ".xml") Then
-                    'creates the path to the 'webextension<number>.xml' file inside the unzipped folder
-                    strWebExtensionXMLFullName = strTemporalFolder & "\word\webextensions\" & objFile.name
-
-                    'checks if the file 'webextension<number>.xml' exists
-                    If objFileSystem.FileExists(strWebExtensionXMLFullName) Then
                         'opens the XML file, reads and closes it
-                        adoStream.Open
-                        adoStream.LoadFromFile strWebExtensionXMLFullName
-                        strXMLFileContents = adoStream.ReadText
-                        adoStream.Close
+                        strXMLFileContents = AppleScriptTask("MendeleyMacrosHelper_Mac.scpt", "readUTF8XMLFile", strWebExtensionXMLFullName)
 
                         'if the files contains '<we:property name="MENDELEY_CITATIONS"', it is the one we are looking for
                         If InStr(1, strXMLFileContents, "<we:property name=" & Chr(34) & "MENDELEY_CITATIONS" & Chr(34), vbTextCompare) > 0 Then
                             'stops the search, we have the file
-                            Exit For
+                            Exit Do
                         Else
                             'clears the contents of the string and continues searching for the file
                             strXMLFileContents = ""
                         End If
-                    End If 'checks if the file 'webextension<number>.xml' exists
 
-                End If 'if the file name starts with 'webextension' and finishes with '.xml'
-            Next objFile 'iterates over all files in folder 'word\webextensions\'
+                    End If 'if the file name starts with 'webextension' and finishes with '.xml'
 
-            'cleans up the temporary folder
-            objFileSystem.DeleteFolder strTemporalFolder, True
+                    'gets the next file name in folder 'word/webextensions/'
+                    strCurrentXMLFile = Dir()
 
-        End If 'if the zip file could be opened
+                Loop 'iterates over all files in folder 'word/webextensions/'
+
+                'cleans up the temporary folder
+                AppleScriptTask "MendeleyMacrosHelper_Mac.scpt", "deleteTemporaryFolder", strTemporaryFolder
+
+            End If 'extracts the zip file
+
+        '#####On macOS - End#####
+
+        'if Mendeley Macros are running on Windows
+        #Else
+        '#####On Windows - Start#####
+
+            'MsgBox "On Windows"
+
+            'sets error handling for testing if object ADODB.Stream is available
+            On Error Resume Next
+            'creates an ADODB.Stream object (used to read the UTF-8 XML files)
+            Set adoStream = CreateObject("ADODB.Stream")
+            'checks if the object ADODB.Stream was successfully created
+            If Err.Number <> 0 Then
+                'The reference to 'Microsoft ActiveX Data Objects 6.1 Library' has not been added, object ADODB.Stream is not available
+                '(the reference is automatically added, this error just means that object ADODB.Stream was not created)
+                MsgBox "Your document exceeds the maximum number of citations." & vbCrLf & vbCrLf & _
+                    "ADODB.Stream is necessary in this extreme case." & vbCrLf & _
+                    "Enable the ADODB object and try again." & vbCrLf & vbCrLf & _
+                    "Cannot continue creating hyperlinks.", _
+                    vbCritical, "GAUG_getMendeleyWebExtensionXMLFileContents()"
+
+                'stops the execution
+                End
+            End If
+            'sets back default error handling by VBA
+            On Error GoTo 0
+
+            'sets the character set for the stream
+            adoStream.Charset = "UTF-8"
+
+            'initializes the file system object
+            Set objFileSystem = CreateObject("Scripting.FileSystemObject")
+
+
+            'builds the path for a temporary folder to unzip the document
+            strTemporaryFolder = Environ$("temp") & "\" & "MendeleyMacros_GAUG_temp"
+
+            'cleans up temporary folder if it exists
+            If objFileSystem.FolderExists(strTemporaryFolder) Then
+                objFileSystem.DeleteFolder strTemporaryFolder, True
+            End If
+
+            'creates temporary folder
+            objFileSystem.CreateFolder strTemporaryFolder
+
+            'copies the .docx file and renames it to .zip
+            strZipDocumentFullName = strTemporaryFolder & "\" & strDocumentName & ".zip"
+            objFileSystem.CopyFile strDocumentFullName, strZipDocumentFullName
+
+            'initializes the shell object
+            Set objShell = CreateObject("Shell.Application")
+            'opens the zip file (which is the .docx file)
+            Set objZipAsFolder = objShell.namespace(CVar(strZipDocumentFullName))
+
+            'if the zip file could be opened
+            If Not objZipAsFolder Is Nothing Then
+                'extracts the zip file (copies the files from the zip to the temporary folder without showing progress)
+                objShell.namespace(CVar(strTemporaryFolder)).CopyHere objZipAsFolder.items, 4
+
+                'Microsoft Word may have several web extensions installed
+                'we need to find the file that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
+
+                'iterates over all files in folder 'word\webextensions\'
+                For Each objFile In objFileSystem.GetFolder(CVar(strTemporaryFolder & "\" & "word\webextensions")).Files
+                    'if the file name starts with 'webextension' and finishes with '.xml'
+                    If (Left(objFile.name, 12) = "webextension") And (Right(objFile.name, 4) = ".xml") Then
+                        'creates the path to the 'webextension<number>.xml' file inside the unzipped folder
+                        strWebExtensionXMLFullName = strTemporaryFolder & "\word\webextensions\" & objFile.name
+
+                        'checks if the file 'webextension<number>.xml' exists
+                        If objFileSystem.FileExists(strWebExtensionXMLFullName) Then
+                            'opens the XML file, reads and closes it
+                            adoStream.Open
+                            adoStream.LoadFromFile strWebExtensionXMLFullName
+                            strXMLFileContents = adoStream.ReadText
+                            adoStream.Close
+
+                            'if the files contains '<we:property name="MENDELEY_CITATIONS"', it is the one we are looking for
+                            If InStr(1, strXMLFileContents, "<we:property name=" & Chr(34) & "MENDELEY_CITATIONS" & Chr(34), vbTextCompare) > 0 Then
+                                'stops the search, we have the file
+                                Exit For
+                            Else
+                                'clears the contents of the string and continues searching for the file
+                                strXMLFileContents = ""
+                            End If
+                        End If 'checks if the file 'webextension<number>.xml' exists
+
+                    End If 'if the file name starts with 'webextension' and finishes with '.xml'
+                Next objFile 'iterates over all files in folder 'word\webextensions\'
+
+                'cleans up the temporary folder
+                objFileSystem.DeleteFolder strTemporaryFolder, True
+
+            End If 'if the zip file could be opened
+
+        '#####On Windows - End#####
+        #End If
+
+
     End If 'checks if the document has a file path (if it is saved)
+
 
     'returns the contents (if any) of the file 'webextension<number>.xml' that corresponds to Mendeley Reference Manager 2.x (with the App Mendeley Cite)
     GAUG_getMendeleyWebExtensionXMLFileContents = strXMLFileContents
