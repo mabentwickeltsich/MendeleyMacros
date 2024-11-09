@@ -1281,7 +1281,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-23                                                                                                                **
+'**  Last modified: 2024-10-30                                                                                                                **
 '**                                                                                                                                           **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                                                                               **
 '**                                                                                                                                           **
@@ -1293,31 +1293,31 @@ End Function
 '***********************************************************************************************************************************************
 Sub GAUG_createHyperlinksForCitationsAPA()
 
-    Dim intAvailableMendeleyVersion, intUseMendeleyVersion As Integer
+    Dim intAvailableMendeleyVersion As Integer, intUseMendeleyVersion As Integer
     Dim documentSection As Section
-    Dim blnFound, blnBibliographyFound, blnCitationFound, blnReferenceEntryFound, blnCitationEntryFound, blnGenerateHyperlinksForURLs, blnURLFound As Boolean
+    Dim blnFound As Boolean, blnBibliographyFound As Boolean, blnCitationFound As Boolean, blnReferenceEntryFound As Boolean, blnCitationEntryFound As Boolean, blnGenerateHyperlinksForURLs As Boolean, blnURLFound As Boolean
     Dim intReferenceNumber As Integer
-    Dim objRegExpBibliographyEntries, objRegExpVisibleCitationItems, objRegExpFindBibliographyEntry, objRegExpFindVisibleCitationItem, objRegExpURL As Object
-    Dim colMatchesBibliographyEntries, colMatchesVisibleCitationItems, colMatchesFindBibliographyEntry, colMatchesFindVisibleCitationItem, colMatchesURL As Object
-    Dim objMatchBibliographyEntry, objMatchVisibleCitationItem, objMatchFindBibliographyEntry, objMatchURL As Object
-    Dim strBookmarkInBibliography, arrStrBookmarksInBibliography() As String
-    Dim strTempMatch, strSubStringOfTempMatch, strLastAuthorsOrEditors As String
+    Dim objRegExpBibliographyEntries As Object, objRegExpVisibleCitationItems As Object, objRegExpFindBibliographyEntry As Object, objRegExpFindVisibleCitationItem As Object, objRegExpURL As Object
+    Dim colMatchesBibliographyEntries As Object, colMatchesVisibleCitationItems As Object, colMatchesFindBibliographyEntry As Object, colMatchesFindVisibleCitationItem As Object, colMatchesURL As Object
+    Dim objMatchBibliographyEntry As Object, objMatchVisibleCitationItem As Object, objMatchFindBibliographyEntry As Object, objMatchURL As Object
+    Dim strBookmarkInBibliography As Variant, arrStrBookmarksInBibliography() As String
+    Dim strTempMatch As String, strSubStringOfTempMatch As String, strLastAuthorsOrEditors As String
     Dim strTypeOfExecution As String
     Dim blnMabEntwickeltSich As Boolean
     Dim stlStyleInDocument As Word.Style
     Dim strStyleForTitleOfBibliography As String
     Dim blnStyleForTitleOfBibliographyFound As Boolean
-    Dim strURL, strSubStringOfURL As String
-    Dim arrNonDetectedURLs(), varNonDetectedURL As Variant
+    Dim strURL As String, strSubStringOfURL As String
+    Dim arrNonDetectedURLs() As Variant, varNonDetectedURL As Variant
     Dim strDoHyperlinksExist As String
     Dim objCurrentFieldOrContentControl As Object
-    Dim strAllCitationsFullInformation, strCitationFullInfo As String
+    Dim strAllCitationsFullInformation As String, strCitationFullInfo As String
     Dim varCitationItemsFromCitationFullInfo() As Variant
     Dim varPartsFromVisibleCitationItem() As Variant
     Dim varAuthorsFromCitationItem() As Variant
     Dim varEditorsFromCitationItem() As Variant
     Dim varYearFromCitationItem As String
-    Dim intAuthorFromCitationItem, intEditorFromCitationItem As Integer
+    Dim intAuthorFromCitationItem As Integer, intEditorFromCitationItem As Integer
     Dim intCitationItemFromCitationFullInfo As Integer
     Dim strOrphanCitationItems As String
     Dim varFieldsOrContentControls As Variant
@@ -1784,7 +1784,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     Next
                                     'closes the parenthesis in the pattern if more than one author
                                     If UBound(varAuthorsFromCitationItem) > 1 Then
-                                        objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "))"
+                                        objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & Replace(Space(2), " ", ")") ' "))"
                                     End If
 
                                 'but if no authors were found (like with a book with only editors), we use editors instead
@@ -1806,18 +1806,25 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                         objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & "\(Eds?\.\)\.\s*"
                                         'closes the parenthesis in the pattern if more than one editor
                                         If UBound(varEditorsFromCitationItem) > 1 Then
-                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "))"
+                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & Replace(Space(2), " ", ")") '"))"
                                         End If
                                     End If
                                 End If
 
-                                'finishes the patterns including the year and the letter shown in the visible citation item
-                                objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & varYearFromCitationItem & varPartsFromVisibleCitationItem(3)
-                                objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & "\(" & varYearFromCitationItem & varPartsFromVisibleCitationItem(3) & "\)"
-                                'MsgBox objMatchVisibleCitationItem.value & " -> *" & _
-                                '    varPartsFromVisibleCitationItem(1) & "*" & varPartsFromVisibleCitationItem(2) & "*" & varPartsFromVisibleCitationItem(3) & "*" & vbCrLf & vbCrLf & _
-                                '    objRegExpFindVisibleCitationItem.pattern & vbCrLf & vbCrLf & _
-                                '    objRegExpFindBibliographyEntry.pattern
+                                'if authors or editors exist
+                                If (objRegExpFindBibliographyEntry.pattern <> "" And objRegExpFindVisibleCitationItem.pattern <> "") Then
+
+                                    'finishes the patterns including the year and the letter shown in the visible citation item
+                                    objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & varYearFromCitationItem & varPartsFromVisibleCitationItem(3)
+                                    objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & "\(" & varYearFromCitationItem & varPartsFromVisibleCitationItem(3) & "\)"
+                                    'MsgBox objMatchVisibleCitationItem.value & " -> *" & _
+                                    '    varPartsFromVisibleCitationItem(1) & "*" & varPartsFromVisibleCitationItem(2) & "*" & varPartsFromVisibleCitationItem(3) & "*" & vbCrLf & vbCrLf & _
+                                    '    objRegExpFindVisibleCitationItem.pattern & vbCrLf & vbCrLf & _
+                                    '    objRegExpFindBibliographyEntry.pattern
+                                Else
+                                    objRegExpFindVisibleCitationItem.pattern = "Error: No authors or editors"
+                                    objRegExpFindBibliographyEntry.pattern = "Error: No authors or editors"
+                                End If
 
                                 'if the current visible citation item has authors's family names (not only the year)
                                 If Len(varPartsFromVisibleCitationItem(1)) > 0 Then
@@ -1840,6 +1847,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
                         'last verification to make sure we are here because this item from the citation full information corresponds
                         'to the visible citation item being treated and not because the for loop reached the end
+                        'it also checks the case when both authors and editors are not present
                         If colMatchesFindVisibleCitationItem.Count = 0 Then
                             'cleans the regular expression as no matches were found
                             objRegExpFindBibliographyEntry.pattern = "Error: Citation not found"
