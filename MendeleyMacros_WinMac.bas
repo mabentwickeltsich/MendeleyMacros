@@ -1325,6 +1325,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim intTotalURLsWithoutHyperlink As Integer
     Dim strBibliographyFullEntries() As String
     Dim lngCurrentBibliographyFullEntry As Long
+    Dim strVisibleTextOfCurrentCitation As String
 
 
 '*****************************
@@ -1731,6 +1732,19 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                         varCitationItemsFromCitationFullInfo = GAUG_getCitationItemsFromCitationFullInfo(intAvailableMendeleyVersion, strCitationFullInfo)
                 End Select
 
+                'gets the visible text of the current citation, excluding the parenthesis (used to make sure all citation items are treated)
+                strVisibleTextOfCurrentCitation = Selection
+                If Left(strVisibleTextOfCurrentCitation, 1) = "(" Then
+                    strVisibleTextOfCurrentCitation = Right(strVisibleTextOfCurrentCitation, Len(strVisibleTextOfCurrentCitation) - 1)
+                End If
+                If Right(strVisibleTextOfCurrentCitation, 1) = ")" Then
+                    strVisibleTextOfCurrentCitation = Left(strVisibleTextOfCurrentCitation, Len(strVisibleTextOfCurrentCitation) - 1)
+                Else
+                    If Left(Right(strVisibleTextOfCurrentCitation, 2), 1) = ")" Then
+                        strVisibleTextOfCurrentCitation = Left(strVisibleTextOfCurrentCitation, Len(strVisibleTextOfCurrentCitation) - 2)
+                    End If
+                End If
+
                 'checks that the string can be compared
                 If objRegExpVisibleCitationItems.Test(Selection) Then
                     'gets the matches (all entries in the citation according to the regular expression)
@@ -1773,18 +1787,22 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                 If Not Not varAuthorsFromCitationItem Then
                                     For intAuthorFromCitationItem = 1 To UBound(varAuthorsFromCitationItem)
                                         'gets the last name of the author and adds it to the regular expression (used to find the entry in the bibliography)
-                                        objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFromCitationItem(intAuthorFromCitationItem)) & ".*"
-                                        'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
-                                        objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFromCitationItem(intAuthorFromCitationItem)) & ".*"
-                                        'if this is the first author of many, this could be the only one listed, and the rest as "et al."
-                                        If intAuthorFromCitationItem = 1 And UBound(varAuthorsFromCitationItem) > 1 Then
+                                        objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFromCitationItem(intAuthorFromCitationItem)) & ".*" '",?[A-Z\.\s]*[&,\s]*"
+                                        'creates another regular expression to match the entry in the hidden data with the citation item in the visible text
+                                        If intAuthorFromCitationItem = 1 Then
+                                            'if this is the first author, there could be only two and "&" is used, otherwise "," is used
+                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & GAUG_getSafeStringForRegularExpressions(varAuthorsFromCitationItem(intAuthorFromCitationItem)) & "\s?(&|,)?\s?"
+                                        Else
+                                            'if this is not the first author, "," is used to separate them
+                                            'if this is not the first author of many, this could have been replaced by "et al." in the current citation item
                                             'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
-                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "((et al\..*)|("
+                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "((et al\..*)|(" & GAUG_getSafeStringForRegularExpressions(varAuthorsFromCitationItem(intAuthorFromCitationItem)) & ",?\s?"
                                         End If
                                     Next
                                     'closes the parenthesis in the pattern if more than one author
                                     If UBound(varAuthorsFromCitationItem) > 1 Then
-                                        objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & Replace(Space(2), " ", ")") ' "))"
+                                        'adds "))" for each of the authors, excluding the first one
+                                        objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & Replace(Space(UBound(varAuthorsFromCitationItem) - 1), " ", "))")
                                     End If
 
                                 'but if no authors were found (like with a book with only editors), we use editors instead
@@ -1793,20 +1811,24 @@ Sub GAUG_createHyperlinksForCitationsAPA()
                                     If Not Not varEditorsFromCitationItem Then
                                         For intEditorFromCitationItem = 1 To UBound(varEditorsFromCitationItem)
                                             'gets the last name of the editor and adds it to the regular expression (used to find the entry in the bibliography)
-                                            objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFromCitationItem(intEditorFromCitationItem)) & ".*"
-                                            'creates another regular expression to match the entry in the bibliography with the citation item in the visible text, they are not in the same position as thought
-                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFromCitationItem(intEditorFromCitationItem)) & ".*"
-                                            'if this is the first editor of many, this could be the only one listed, and the rest as "et al."
-                                            If intEditorFromCitationItem = 1 And UBound(varEditorsFromCitationItem) > 1 Then
+                                            objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFromCitationItem(intEditorFromCitationItem)) & ".*" '",?[A-Z\.\s]*[&,\s]*"
+                                            'creates another regular expression to match the entry in the hidden data with the citation item in the visible text
+                                            If intEditorFromCitationItem = 1 Then
+                                                'if this is the first editor, there could be only two and "&" is used, otherwise "," is used
+                                                objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & GAUG_getSafeStringForRegularExpressions(varEditorsFromCitationItem(intEditorFromCitationItem)) & "\s?(&|,)?\s?"
+                                            Else
+                                                'if this is not the first editor, "," is used to separate them
+                                                'if this is not the first editor of many, this could have been replaced by "et al." in the current citation item
                                                 'includes the part to check for "et al." (only for the visible citation item, the entry in the bibliography has the full list)
-                                                objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "((et al\..*)|("
+                                                objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & "((et al\..*)|(" & GAUG_getSafeStringForRegularExpressions(varEditorsFromCitationItem(intEditorFromCitationItem)) & ",?\s?"
                                             End If
                                         Next
                                         'because the citation has editors, we make sure the text '(Eds.)' or '(Ed.)' is present in the bibliography
                                         objRegExpFindBibliographyEntry.pattern = objRegExpFindBibliographyEntry.pattern & "\(Eds?\.\)\.\s*"
                                         'closes the parenthesis in the pattern if more than one editor
                                         If UBound(varEditorsFromCitationItem) > 1 Then
-                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & Replace(Space(2), " ", ")") '"))"
+                                            'adds "))" for each of the editors, excluding the first one
+                                            objRegExpFindVisibleCitationItem.pattern = objRegExpFindVisibleCitationItem.pattern & Replace(Space(UBound(varEditorsFromCitationItem) - 1), " ", "))")
                                         End If
                                     End If
                                 End If
@@ -1936,9 +1958,26 @@ Sub GAUG_createHyperlinksForCitationsAPA()
 
                         'at this point current citation entry is linked to corresponding reference in bibliography
 
+                        'if the current match has authors' family names (not only the year)
+                        If Len(varPartsFromVisibleCitationItem(1)) > 0 Then
+                            'removes the current citation item from the visible text variable because it is already treated (if it is NOT the first one)
+                            strVisibleTextOfCurrentCitation = Replace(strVisibleTextOfCurrentCitation, "; " & varPartsFromVisibleCitationItem(1) & ", " & varPartsFromVisibleCitationItem(2) & varPartsFromVisibleCitationItem(3), "", 1, 1)
+                            'removes the current citation item from the visible text variable because it is already treated (if it is the first one)
+                            strVisibleTextOfCurrentCitation = Replace(strVisibleTextOfCurrentCitation, varPartsFromVisibleCitationItem(1) & ", " & varPartsFromVisibleCitationItem(2) & varPartsFromVisibleCitationItem(3), "", 1, 1)
+                        Else
+                            'removes the current citation item from the visible text variable because it is already treated
+                            strVisibleTextOfCurrentCitation = Replace(strVisibleTextOfCurrentCitation, ", " & varPartsFromVisibleCitationItem(2) & varPartsFromVisibleCitationItem(3), "", 1, 1)
+                        End If
+
                     Next 'treats all matches (all entries in citation) to generate hyperlinks
 
                 End If 'checks that the string can be compared
+
+                'if the visible text variable is not empty, some citation item was not linked
+                If Len(Trim(strVisibleTextOfCurrentCitation)) > 0 Then
+                    'MsgBox "Visible text of citation: " & strVisibleTextOfCurrentCitation
+                    strOrphanCitationItems = strOrphanCitationItems & strVisibleTextOfCurrentCitation & vbCrLf
+                End If
 
             End If 'if it is a citation
         Next 'checks all fields or content controls
