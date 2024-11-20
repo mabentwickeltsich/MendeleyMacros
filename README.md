@@ -15,7 +15,8 @@ Macros used with Microsoft Word to add new functionalities to Mendeley's plugin.
 José Luis González García
 
 ## Overview
-You need all the files for your platform to create or remove the hyperlinks. Just import them to Microsoft Word and execute any of the macros `GAUG_*`. macOS requires a regular expression engine which can be downloaded [here](https://github.com/mabentwickeltsich/vba-regex/blob/65f697a3c499a4cd2d24e288dc60a9070f0e2517/aio/build/StaticRegexSingle.bas). The default custom configuration allows you to use the macros without any further modification. See the new detailed instructions bellow on how to install them
+You need all the files for your platform to create or remove the hyperlinks. Just import them to Microsoft Word and execute any of the macros `GAUG_*`. macOS requires a regular expression engine which can be downloaded [here](https://github.com/mabentwickeltsich/vba-regex/blob/65f697a3c499a4cd2d24e288dc60a9070f0e2517/aio/build/StaticRegexSingle.bas). The default custom configuration allows you to use the macros without any further modification. See the new detailed instructions bellow on how to install them.
+Alternatively, you can follow the *Quick start guides* for Windows and macOS available on [my YouTube channel](https://www.youtube.com/@MabEntwickeltSich "MabEntwickeltSich on YouTube").
 
 For those who still use Mendeley Desktop 1.x (with the MS Word plugin Mendeley Cite-O-Matic). If you are annoyed that Mendeley's plugin changes the font style of the bibliography every time you refresh it, then you need to modify the macro `refreshDocument` installed by Mendeley's plugin to correct the problem. If you are happy with your bibliography, just forget about `refreshDocument`. See the detailed instructions bellow on how to modify the original macro.
 
@@ -126,7 +127,7 @@ For more information about macros, check Microsoft Office support:
 
     b. On macOS: You NEED the regular expression engine [StaticRegexSingle](https://github.com/mabentwickeltsich/vba-regex/blob/65f697a3c499a4cd2d24e288dc60a9070f0e2517/aio/build/StaticRegexSingle.bas); download it and import it to your Microsoft Word. It is a fork of another project that has been adapted for Mendeley Macros.
 
-4. The macros `GAUG_*` make use of Streams on Windows and AppleScripts on macOS; hence you need to enable/install them. The streams and AppleScripts are ONLY used with large documents; however, they need to be enabled/installed to prevent errors.
+4. The macros `GAUG_*` make use of Streams on Windows and AppleScripts on macOS; hence you need to enable/install them. The Streams and AppleScripts are ONLY used with large documents; however, they need to be enabled/installed to prevent errors.
 
     a. On Windows: This step is optional; only required if the macros ask for it. Enable the ADODB object in Microsoft Visual Basic for Applications. Open the menu “Tools” | “References” and check the box next to “Microsoft ActiveX Data Objects 6.1 Library”.
     For more information on how to activate the ADODB object, check Microsoft Office VBA Reference:
@@ -157,7 +158,7 @@ ALWAYS have a BACKUP COPY of your document BEFORE using these macros.
 
 Execute the desired macro. See also **Extending/modifying the code**.
 
-When your document is large enough (around 180 or more citations), Mendeley Macros will extract the contents of the document into a temporary folder in order to read the full information of all the citations. This is the only way due to an error within Microsoft Word which prevents Mendeley Macros to directly gather the information. On Windows, this process is transparent, you will not notice it. On macOS, due to the sandbox restrictions, Mendeley Macros make use of the AppleScripts described on the installation. You MUST grant permissions be able to access the folder where your document is located, the temporary folder (that Mendeley Macros create) and the file webextension1.xml (extracted from your document into the temporary folder).
+When your document is large enough (around 180 or more citations), Mendeley Macros will extract the contents of the document into a temporary folder in order to read the full information of all the citations. This is the only way due to an error within Microsoft Word which prevents Mendeley Macros to directly gather the information. On Windows, this process is transparent, you will not notice it. On macOS, due to the sandbox restrictions, Mendeley Macros make use of the AppleScripts described on the installation. You MUST grant permissions to be able to access the folder where your document is located, the temporary folder (that Mendeley Macros create) and the file webextension1.xml (extracted from your document into the temporary folder).
 
 My recommendation for a typical usage is to keep your document free of any manual modification to the bibliography or to the citations inserted by Mendeley, but you can merge the citations with the standard way provided by Mendeley: [1][2][3][4] becomes [1]-[4]. This also applies for the APA CSL citation style.
 
