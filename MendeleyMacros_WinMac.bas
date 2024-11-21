@@ -1288,7 +1288,7 @@ End Function
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-11-04                                                                                                                **
+'**  Last modified: 2024-11-21                                                                                                                **
 '**                                                                                                                                           **
 '**  Sub GAUG_createHyperlinksForCitationsAPA()                                                                                               **
 '**                                                                                                                                           **
@@ -1311,6 +1311,7 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     Dim strTempMatch As String, strSubStringOfTempMatch As String, strLastAuthorsOrEditors As String
     Dim strTypeOfExecution As String
     Dim blnMabEntwickeltSich As Boolean
+    Dim blnShowDonationsToMabEntwickeltSich As Boolean
     Dim stlStyleInDocument As Word.Style
     Dim strStyleForTitleOfBibliography As String
     Dim blnStyleForTitleOfBibliographyFound As Boolean
@@ -1373,6 +1374,10 @@ Sub GAUG_createHyperlinksForCitationsAPA()
     'SEE DOCUMENTATION
     'When Mendeley Reference Manager 2.x is used, ONLY "RemoveHyperlinks" is available
     strTypeOfExecution = "RemoveHyperlinks"
+
+    'possible values are True and False
+    'when set to True, the donation message is shown
+    blnShowDonationsToMabEntwickeltSich = True
 
 
 
@@ -2015,6 +2020,15 @@ Sub GAUG_createHyperlinksForCitationsAPA()
         End
     End If
 
+    'donations to MabEntwickeltSich
+    If blnShowDonationsToMabEntwickeltSich Then
+        MsgBox "The hyperlinks are ready!" & vbCrLf & vbCrLf & _
+            "Please consider a donation if you find the macros useful," & vbCrLf & _
+            "it helps keep the project alive." & vbCrLf & vbCrLf & _
+            "https://paypal.me/MabEntwickeltSich", _
+            vbInformation, "GAUG_createHyperlinksForCitationsAPA()"
+    End If
+
     'returns to original position in the document
     currentPosition.Select
 
@@ -2028,7 +2042,7 @@ End Sub
 '***********************************************************************************************************************************************
 '***********************************************************************************************************************************************
 '**  Author: José Luis González García                                                                                                        **
-'**  Last modified: 2024-10-09                                                                                                                **
+'**  Last modified: 2024-11-21                                                                                                                **
 '**                                                                                                                                           **
 '**  Sub GAUG_createHyperlinksForCitationsIEEE()                                                                                              **
 '**                                                                                                                                           **
@@ -2051,6 +2065,7 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     Dim blnIncludeSquareBracketsInHyperlinks As Boolean
     Dim strTypeOfExecution As String
     Dim blnMabEntwickeltSich As Boolean
+    Dim blnShowDonationsToMabEntwickeltSich As Boolean
     Dim stlStyleInDocument As Word.Style
     Dim strStyleForTitleOfBibliography As String
     Dim blnStyleForTitleOfBibliographyFound As Boolean
@@ -2108,6 +2123,10 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
     'SEE DOCUMENTATION
     'When Mendeley Reference Manager 2.x is used, ONLY "RemoveHyperlinks" is available
     strTypeOfExecution = "RemoveHyperlinks"
+
+    'possible values are True and False
+    'when set to True, the donation message is shown
+    blnShowDonationsToMabEntwickeltSich = True
 
 
 
@@ -2551,6 +2570,15 @@ Sub GAUG_createHyperlinksForCitationsIEEE()
             "then go to the menu Insert and click on Link.", _
             vbExclamation, "GAUG_createHyperlinksForCitationsIEEE()"
         End
+    End If
+
+    'donations to MabEntwickeltSich
+    If blnShowDonationsToMabEntwickeltSich Then
+        MsgBox "The hyperlinks are ready!" & vbCrLf & vbCrLf & _
+            "Please consider a donation if you find the macros useful," & vbCrLf & _
+            "it helps keep the project alive." & vbCrLf & vbCrLf & _
+            "https://paypal.me/MabEntwickeltSich", _
+            vbInformation, "GAUG_createHyperlinksForCitationsIEEE()"
     End If
 
     'returns to original position in the document
